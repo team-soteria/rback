@@ -2,6 +2,10 @@
 
 A simple `RBAC in Kubernetes` visualizer.
 
+This is heavy WIP, come back later for post-MVP implementation ;)
+
+
+
 ## Install
 
 Dependencies:
@@ -9,10 +13,10 @@ Dependencies:
 - Access to a Kubernetes cluster
 - `kubectl` installed and configured
 
-Download and install `rback`:
+For now, no binaries, use from source:
 
 ```sh
-$ curl -L ...
+$ go run 
 ```
 
 ## Usage

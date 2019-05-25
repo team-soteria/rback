@@ -1,19 +1,80 @@
 digraph  {
-        subgraph cluster_s0 {
-                ID = "cluster_s0";
-                label="kube-public";
-                n1[label="system:controller:bootstrap-signer"];
-
-        }subgraph cluster_s1 {
-                ID = "cluster_s1";
-                label="kube-system";
-                n2[label="extension-apiserver-authentication-reader"];
-                n3[label="system::leader-locking-kube-controller-manager"];
-                n4[label="system::leader-locking-kube-scheduler"];
-                n5[label="system:controller:bootstrap-signer"];
-                n6[label="system:controller:cloud-provider"];
-                n7[label="system:controller:token-cleaner"];
-
-        }
-
+	subgraph cluster_s2 {
+		ID = "cluster_s2";
+		color="#2f6de1";label="cluster-wide";
+		n8[label="admin"];
+		n9[label="aws-node"];
+		n10[label="cluster-admin"];
+		n11[label="edit"];
+		n12[label="eks:node-bootstrapper"];
+		n13[label="eks:podsecuritypolicy:privileged"];
+		n14[label="system:aggregate-to-admin"];
+		n15[label="system:aggregate-to-edit"];
+		n16[label="system:aggregate-to-view"];
+		n17[label="system:auth-delegator"];
+		n18[label="system:aws-cloud-provider"];
+		n19[label="system:basic-user"];
+		n20[label="system:certificates.k8s.io:certificatesigningrequests:nodeclient"];
+		n21[label="system:certificates.k8s.io:certificatesigningrequests:selfnodeclient"];
+		n22[label="system:controller:attachdetach-controller"];
+		n23[label="system:controller:certificate-controller"];
+		n24[label="system:controller:clusterrole-aggregation-controller"];
+		n25[label="system:controller:cronjob-controller"];
+		n26[label="system:controller:daemon-set-controller"];
+		n27[label="system:controller:deployment-controller"];
+		n28[label="system:controller:disruption-controller"];
+		n29[label="system:controller:endpoint-controller"];
+		n30[label="system:controller:expand-controller"];
+		n31[label="system:controller:generic-garbage-collector"];
+		n32[label="system:controller:horizontal-pod-autoscaler"];
+		n33[label="system:controller:job-controller"];
+		n34[label="system:controller:namespace-controller"];
+		n35[label="system:controller:node-controller"];
+		n36[label="system:controller:persistent-volume-binder"];
+		n37[label="system:controller:pod-garbage-collector"];
+		n38[label="system:controller:pv-protection-controller"];
+		n39[label="system:controller:pvc-protection-controller"];
+		n40[label="system:controller:replicaset-controller"];
+		n41[label="system:controller:replication-controller"];
+		n42[label="system:controller:resourcequota-controller"];
+		n43[label="system:controller:route-controller"];
+		n44[label="system:controller:service-account-controller"];
+		n45[label="system:controller:service-controller"];
+		n46[label="system:controller:statefulset-controller"];
+		n47[label="system:controller:ttl-controller"];
+		n48[label="system:coredns"];
+		n49[label="system:csi-external-attacher"];
+		n50[label="system:csi-external-provisioner"];
+		n51[label="system:discovery"];
+		n52[label="system:heapster"];
+		n53[label="system:kube-aggregator"];
+		n54[label="system:kube-controller-manager"];
+		n55[label="system:kube-dns"];
+		n56[label="system:kube-scheduler"];
+		n57[label="system:kubelet-api-admin"];
+		n58[label="system:node"];
+		n59[label="system:node-bootstrapper"];
+		n60[label="system:node-problem-detector"];
+		n61[label="system:node-proxier"];
+		n62[label="system:persistent-volume-provisioner"];
+		n63[label="system:volume-scheduler"];
+		n64[label="view"];
+		
+	}subgraph cluster_s0 {
+		ID = "cluster_s0";
+		label="kube-public";
+		n1[label="system:controller:bootstrap-signer"];
+		
+	}subgraph cluster_s1 {
+		ID = "cluster_s1";
+		label="kube-system";
+		n2[label="extension-apiserver-authentication-reader"];
+		n3[label="system::leader-locking-kube-controller-manager"];
+		n4[label="system::leader-locking-kube-scheduler"];
+		n5[label="system:controller:bootstrap-signer"];
+		n6[label="system:controller:cloud-provider"];
+		n7[label="system:controller:token-cleaner"];
+		
+	}
+	
 }

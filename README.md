@@ -13,10 +13,11 @@ Dependencies:
 - Access to a Kubernetes cluster
 - `kubectl` installed and configured
 
-For now, no binaries, use from source:
+For now, no binaries, use from source with Go 1.12:
 
 ```sh
-$ go run 
+$ git clone https://github.com/mhausenblas/rback.git && cd rback
+$ go build
 ```
 
 ## Usage

@@ -28,5 +28,5 @@ There are plenty of Graphviz (`dot`) online visualization tools available, for e
 Install [Graphviz](https://www.graphviz.org/), for example, on macOS you can do `brew install graphviz`. Then you can do the following (on macOS):
 
 ```sh
-$ rback | dot -Tpng  > /tmp/rback.png && open $_
+$ rback | dot -Tpng  > /tmp/rback.png && open /tmp/rback.png
 ```

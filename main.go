@@ -88,7 +88,7 @@ func getPermissions() (Permissions, error) {
 	return p, nil
 }
 
-func lookupNamespacedResources(namespace, sa string, p Permissions) (roles []string, err error) {
+func lookupRoles(namespace, sa string, p Permissions) (roles []string, err error) {
 	for _, rb := range p.RoleBindings[namespace] {
 		res, err := kubecuddler.Kubectl(true, true, "", "--namespace", namespace, "get", "rolebinding", rb, "--output", "json")
 		if err != nil {
@@ -116,7 +116,7 @@ func lookupNamespacedResources(namespace, sa string, p Permissions) (roles []str
 	return roles, nil
 }
 
-func lookupResources(sa string, p Permissions) (clusterroles []string, err error) {
+func lookupClusterRoles(sa string, p Permissions) (clusterroles []string, err error) {
 	for _, crb := range p.ClusterRoleBindings {
 		res, err := kubecuddler.Kubectl(true, true, "", "get", "clusterrolebinding", crb, "--output", "json")
 		if err != nil {
@@ -144,20 +144,46 @@ func lookupResources(sa string, p Permissions) (clusterroles []string, err error
 	return clusterroles, nil
 }
 
+func lookupResources(namespace, role string, p Permissions) (resources string, err error) {
+	if namespace != "" {
+		return "", nil
+	}
+	res, err := kubecuddler.Kubectl(true, true, "", "get", "clusterrole", role, "--output", "json")
+	if err != nil {
+		return "", err
+	}
+	var d map[string]interface{}
+	b := []byte(res)
+	err = json.Unmarshal(b, &d)
+	if err != nil {
+		return "", err
+	}
+	rules := d["rules"].([]interface{})
+	resources = fmt.Sprintf("%v", rules)
+	return resources, nil
+}
+
 func genGraph(p Permissions) *dot.Graph {
 	g := dot.NewGraph(dot.Directed)
 	for ns, serviceaccounts := range p.ServiceAccounts {
 		gns := g.Subgraph(ns, dot.ClusterOption{})
 		for _, sa := range serviceaccounts {
-			gns.Node(sa).Attr("style", "filled").Attr("fillcolor", "#2f6de1").Attr("fontcolor", "#f0f0f0")
-			// fmt.Fprintf(os.Stderr, "in namespace [%v], looking up resources for service account [%v]\n", ns, sa)
-			roles, err := lookupResources(sa, p)
+			sanode := gns.Node(sa).Attr("style", "filled").Attr("fillcolor", "#2f6de1").Attr("fontcolor", "#f0f0f0")
+			roles, err := lookupClusterRoles(sa, p)
 			if err != nil {
 				fmt.Printf("Can't look up entities and resources due to: %v", err)
 				os.Exit(-2)
 			}
 			for _, role := range roles {
-				gns.Node(role).Attr("style", "filled").Attr("fillcolor", "#ff9900").Attr("fontcolor", "#030303")
+				res, err := lookupResources("", role, p)
+				if err != nil {
+					fmt.Printf("Can't look up entities and resources due to: %v", err)
+					os.Exit(-3)
+				}
+				crnode := gns.Node(role).Attr("style", "filled").Attr("fillcolor", "#ff9900").Attr("fontcolor", "#030303")
+				resnode := gns.Node(res)
+				gns.Edge(sanode, crnode)
+				gns.Edge(crnode, resnode)
 			}
 		}
 	}

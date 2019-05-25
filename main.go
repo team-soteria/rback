@@ -10,7 +10,7 @@ import (
 )
 
 type RnB struct {
-	Roles               []string
+	Roles               map[string][]string
 	ClusterRoles        string
 	RoleBindings        string
 	ClusterRoleBindings string
@@ -27,24 +27,31 @@ func main() {
 }
 
 func getRolesNBindings() (RnB, error) {
-	var rnb RnB
+	rnb := RnB{
+		Roles:               make(map[string][]string),
+		ClusterRoles:        "",
+		RoleBindings:        "",
+		ClusterRoleBindings: "",
+	}
 	res, err := kubecuddler.Kubectl(true, true, "", "get", "roles", "--all-namespaces", "--no-headers")
 	if err != nil {
 		return rnb, err
 	}
+
 	for _, r := range strings.Split(res, "\n") {
 		f := strings.Fields(r)
-		rnb.Roles = append(rnb.Roles, fmt.Sprintf("ns %v name %v", f[0], f[1]))
+		rnb.Roles[f[0]] = append(rnb.Roles[f[0]], f[1])
 	}
-
 	return rnb, nil
 }
 
 func genGraph(rnb RnB) *dot.Graph {
 	g := dot.NewGraph(dot.Directed)
-	groles := g.Subgraph("roles")
-	for _, r := range rnb.Roles {
-		groles.Node(r)
+	for ns, names := range rnb.Roles {
+		groles := g.Subgraph(ns, dot.ClusterOption{})
+		for _, name := range names {
+			groles.Node(name)
+		}
 	}
 	return g
 }

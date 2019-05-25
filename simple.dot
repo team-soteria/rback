@@ -1,0 +1,19 @@
+digraph  {
+        subgraph cluster_s0 {
+                ID = "cluster_s0";
+                label="kube-public";
+                n1[label="system:controller:bootstrap-signer"];
+
+        }subgraph cluster_s1 {
+                ID = "cluster_s1";
+                label="kube-system";
+                n2[label="extension-apiserver-authentication-reader"];
+                n3[label="system::leader-locking-kube-controller-manager"];
+                n4[label="system::leader-locking-kube-scheduler"];
+                n5[label="system:controller:bootstrap-signer"];
+                n6[label="system:controller:cloud-provider"];
+                n7[label="system:controller:token-cleaner"];
+
+        }
+
+}

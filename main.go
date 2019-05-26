@@ -232,9 +232,27 @@ func lookupClusterRoles(sa string, p Permissions) (clusterroles []string, err er
 // lookupResources lists resources referenced in a role.
 // if namespace is empty then the scope is cluster-wide.
 func lookupResources(namespace, role string, p Permissions) (resources string, err error) {
-	if namespace != "" {
-		return "", nil
+	if namespace != "" { // look up in roles
+		for _, roles := range p.Roles[namespace] {	
+			var d map[string]interface{}
+			b := []byte(roles)
+			err = json.Unmarshal(b, &d)
+			if err != nil {
+				return "", err
+			}
+			metadata := d["metadata"].(map[string]interface{})
+			rname := metadata["name"]
+			if rname == role {
+				rules := d["rules"].([]interface{})
+				for _, rule := range rules {
+					r := rule.(map[string]interface{})
+					rj, _ := struct2json(r)
+					resources += fmt.Sprintf("%v\n", rj)
+				}
+			}
+		}
 	}
+	// ... otherwise, look up in cluster roles:
 	for _, cr := range p.ClusterRoles {	
 		var d map[string]interface{}
 		b := []byte(cr)
@@ -262,16 +280,17 @@ func genGraph(p Permissions) *dot.Graph {
 		gns := g.Subgraph(ns, dot.ClusterOption{})
 		for _, sa := range serviceaccounts {
 			sanode := gns.Node(sa).Attr("style", "filled").Attr("fillcolor", "#2f6de1").Attr("fontcolor", "#f0f0f0")
-			roles, err := lookupClusterRoles(sa, p)
+			// cluster roles:
+			croles, err := lookupClusterRoles(sa, p)
 			if err != nil {
-				fmt.Printf("Can't look up entities and resources due to: %v", err)
+				fmt.Printf("Can't look up cluster roles due to: %v", err)
 				os.Exit(-2)
 			}
-			for _, role := range roles {
-				crnode := gns.Node(role).Attr("style", "filled").Attr("fillcolor", "#ff9900").Attr("fontcolor", "#030303")
+			for _, crole := range croles {
+				crnode := gns.Node(crole).Attr("style", "filled").Attr("fillcolor", "#ff9900").Attr("fontcolor", "#030303")
 				gns.Edge(sanode, crnode)
 
-				res, err := lookupResources("", role, p)
+				res, err := lookupResources("", crole, p)
 				if err != nil {
 					fmt.Printf("Can't look up entities and resources due to: %v", err)
 					os.Exit(-3)
@@ -281,6 +300,27 @@ func genGraph(p Permissions) *dot.Graph {
 					gns.Edge(crnode, resnode)
 				}
 			}
+			// roles:
+			roles, err := lookupRoles(ns, sa, p)
+			if err != nil {
+				fmt.Printf("Can't look up roles due to: %v", err)
+				os.Exit(-2)
+			}
+			for _, role := range roles {
+				crnode := gns.Node(role).Attr("style", "filled").Attr("fillcolor", "#ff9900").Attr("fontcolor", "#030303")
+				gns.Edge(sanode, crnode)
+
+				res, err := lookupResources(ns, role, p)
+				if err != nil {
+					fmt.Printf("Can't look up entities and resources due to: %v", err)
+					os.Exit(-3)
+				}
+				if res != "" {
+					resnode := gns.Node(res)
+					gns.Edge(crnode, resnode)
+				}
+			}
+
 		}
 	}
 	return g

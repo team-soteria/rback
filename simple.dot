@@ -1,51 +1,56 @@
 digraph  {
-	subgraph cluster_s5 {
-		ID = "cluster_s5";
+	subgraph cluster_s4 {
+		ID = "cluster_s4";
 		label="cardassian";
-		n14[fillcolor="#2f6de1",fontcolor="#f0f0f0",label="default",style="filled"];
+		n16[fillcolor="#2f6de1",fontcolor="#f0f0f0",label="default",style="filled"];
+		
+	}subgraph cluster_s5 {
+		ID = "cluster_s5";
+		label="cnat";
+		n17[fillcolor="#2f6de1",fontcolor="#f0f0f0",label="default",style="filled"];
 		
 	}subgraph cluster_s6 {
 		ID = "cluster_s6";
-		label="cnat";
-		n15[fillcolor="#2f6de1",fontcolor="#f0f0f0",label="default",style="filled"];
+		label="default";
+		n18[fillcolor="#2f6de1",fontcolor="#f0f0f0",label="default",style="filled"];
 		
 	}subgraph cluster_s0 {
 		ID = "cluster_s0";
-		label="default";
+		label="kboom";
+		n3[fillcolor="#ff9900",fontcolor="#030303",label="cluster-admin",style="filled"];
 		n1[fillcolor="#2f6de1",fontcolor="#f0f0f0",label="default",style="filled"];
+		n2[fillcolor="#2f6de1",fontcolor="#f0f0f0",label="kboom-sa",style="filled"];
+		n4[label="{\"apiGroups\":[\"*\"],\"resources\":[\"*\"],\"verbs\":[\"*\"]}\n{\"nonResourceURLs\":[\"*\"],\"verbs\":[\"*\"]}\n"];
+		n3->n4;
+		n2->n3;
 		
 	}subgraph cluster_s1 {
 		ID = "cluster_s1";
-		label="kboom";
-		n4[fillcolor="#ff9900",fontcolor="#030303",label="cluster-admin",style="filled"];
-		n2[fillcolor="#2f6de1",fontcolor="#f0f0f0",label="default",style="filled"];
-		n3[fillcolor="#2f6de1",fontcolor="#f0f0f0",label="kboom-sa",style="filled"];
-		n5[label="{\"apiGroups\":[\"*\"],\"resources\":[\"*\"],\"verbs\":[\"*\"]}\n{\"nonResourceURLs\":[\"*\"],\"verbs\":[\"*\"]}\n"];
-		n4->n5;
-		n3->n4;
+		label="kube-public";
+		n5[fillcolor="#2f6de1",fontcolor="#f0f0f0",label="default",style="filled"];
 		
 	}subgraph cluster_s2 {
 		ID = "cluster_s2";
-		label="kube-public";
-		n6[fillcolor="#2f6de1",fontcolor="#f0f0f0",label="default",style="filled"];
+		label="kube-system";
+		n6[fillcolor="#ff9900",fontcolor="#030303",label="aws-node",style="filled"];
+		n8[fillcolor="#2f6de1",fontcolor="#f0f0f0",label="coredns",style="filled"];
+		n9[fillcolor="#2f6de1",fontcolor="#f0f0f0",label="default",style="filled"];
+		n10[fillcolor="#2f6de1",fontcolor="#f0f0f0",label="kube-proxy",style="filled"];
+		n11[fillcolor="#ff9900",fontcolor="#030303",label="system:node-proxier",style="filled"];
+		n7[label="{\"apiGroups\":[\"crd.k8s.amazonaws.com\"],\"resources\":[\"*\",\"namespaces\"],\"verbs\":[\"*\"]}\n{\"apiGroups\":[\"\"],\"resources\":[\"pods\",\"nodes\",\"namespaces\"],\"verbs\":[\"list\",\"watch\",\"get\"]}\n{\"apiGroups\":[\"extensions\"],\"resources\":[\"daemonsets\"],\"verbs\":[\"list\",\"watch\"]}\n"];
+		n6->n6;
+		n6->n7;
+		n10->n11;
 		
 	}subgraph cluster_s3 {
 		ID = "cluster_s3";
-		label="kube-system";
-		n7[fillcolor="#ff9900",fontcolor="#030303",label="aws-node",style="filled"];
-		n9[fillcolor="#2f6de1",fontcolor="#f0f0f0",label="coredns",style="filled"];
-		n10[fillcolor="#2f6de1",fontcolor="#f0f0f0",label="default",style="filled"];
-		n11[fillcolor="#2f6de1",fontcolor="#f0f0f0",label="kube-proxy",style="filled"];
-		n12[fillcolor="#ff9900",fontcolor="#030303",label="system:node-proxier",style="filled"];
-		n8[label="{\"apiGroups\":[\"crd.k8s.amazonaws.com\"],\"resources\":[\"*\",\"namespaces\"],\"verbs\":[\"*\"]}\n{\"apiGroups\":[\"\"],\"resources\":[\"pods\",\"nodes\",\"namespaces\"],\"verbs\":[\"list\",\"watch\",\"get\"]}\n{\"apiGroups\":[\"extensions\"],\"resources\":[\"daemonsets\"],\"verbs\":[\"list\",\"watch\"]}\n"];
-		n7->n7;
-		n7->n8;
-		n11->n12;
-		
-	}subgraph cluster_s4 {
-		ID = "cluster_s4";
 		label="rback";
-		n13[fillcolor="#2f6de1",fontcolor="#f0f0f0",label="default",style="filled"];
+		n12[fillcolor="#2f6de1",fontcolor="#f0f0f0",label="default",style="filled"];
+		n13[fillcolor="#2f6de1",fontcolor="#f0f0f0",label="dummy",style="filled"];
+		n14[fillcolor="#ff9900",fontcolor="#030303",label="podreader",style="filled"];
+		n15[label="{\"apiGroups\":[\"\"],\"resources\":[\"pods\"],\"verbs\":[\"get\",\"list\"]}\n"];
+		n13->n14;
+		n14->n15;
 		
 	}
 	

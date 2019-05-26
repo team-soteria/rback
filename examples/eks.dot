@@ -1,58 +1,63 @@
 digraph  {
-	subgraph cluster_s0 {
-		ID = "cluster_s0";
-		label="cardassian";
-		n1[fillcolor="#2f6de1",fontcolor="#f0f0f0",label="default",style="filled"];
-		
-	}subgraph cluster_s1 {
-		ID = "cluster_s1";
-		label="cnat";
-		n2[fillcolor="#2f6de1",fontcolor="#f0f0f0",label="default",style="filled"];
-		
-	}subgraph cluster_s2 {
+	subgraph cluster_s2 {
 		ID = "cluster_s2";
-		label="default";
-		n3[fillcolor="#2f6de1",fontcolor="#f0f0f0",label="default",style="filled"];
+		label="cardassian";
+		n15[fillcolor="#2f6de1",fontcolor="#f0f0f0",label="default",style="filled"];
 		
 	}subgraph cluster_s3 {
 		ID = "cluster_s3";
-		label="kboom";
-		n4[fillcolor="#2f6de1",fontcolor="#f0f0f0",label="default",style="filled"];
-		n5[fillcolor="#2f6de1",fontcolor="#f0f0f0",label="kboom-sa",style="filled"];
+		label="cnat";
+		n16[fillcolor="#2f6de1",fontcolor="#f0f0f0",label="default",style="filled"];
 		
 	}subgraph cluster_s4 {
 		ID = "cluster_s4";
-		label="kube-public";
-		n8[fillcolor="#2f6de1",fontcolor="#f0f0f0",label="default",style="filled"];
+		label="default";
+		n17[fillcolor="#2f6de1",fontcolor="#f0f0f0",label="default",style="filled"];
 		
 	}subgraph cluster_s5 {
 		ID = "cluster_s5";
-		label="kube-system";
-		n9[fillcolor="#2f6de1",fontcolor="#f0f0f0",label="aws-node",style="filled"];
-		n12[fillcolor="#2f6de1",fontcolor="#f0f0f0",label="coredns",style="filled"];
-		n13[fillcolor="#2f6de1",fontcolor="#f0f0f0",label="default",style="filled"];
-		n14[fillcolor="#2f6de1",fontcolor="#f0f0f0",label="kube-proxy",style="filled"];
+		label="kboom";
+		n18[fillcolor="#2f6de1",fontcolor="#f0f0f0",label="default",style="filled"];
+		n19[fillcolor="#2f6de1",fontcolor="#f0f0f0",label="kboom-sa",style="filled"];
 		
 	}subgraph cluster_s6 {
 		ID = "cluster_s6";
+		label="kube-public";
+		n22[fillcolor="#2f6de1",fontcolor="#f0f0f0",label="default",style="filled"];
+		
+	}subgraph cluster_s0 {
+		ID = "cluster_s0";
+		label="kube-system";
+		n4[fillcolor="#2f6de1",fontcolor="#f0f0f0",label="aws-node",style="filled"];
+		n7[fillcolor="#2f6de1",fontcolor="#f0f0f0",label="coredns",style="filled"];
+		n8[fillcolor="#2f6de1",fontcolor="#f0f0f0",label="default",style="filled"];
+		n9[fillcolor="#2f6de1",fontcolor="#f0f0f0",label="kube-proxy",style="filled"];
+		
+	}subgraph cluster_s1 {
+		ID = "cluster_s1";
 		label="rback";
-		n16[fillcolor="#2f6de1",fontcolor="#f0f0f0",label="default",style="filled"];
-		n17[fillcolor="#2f6de1",fontcolor="#f0f0f0",label="dummy",style="filled"];
-		n18[fillcolor="#ff9900",fontcolor="#030303",label="podreader",style="filled"];
-		n19[label="{\"apiGroups\":[\"\"],\"resources\":[\"pods\"],\"verbs\":[\"get\",\"list\"]}\n"];
-		n17->n18;
-		n18->n19;
+		n11[fillcolor="#2f6de1",fontcolor="#f0f0f0",label="default",style="filled"];
+		n12[fillcolor="#2f6de1",fontcolor="#f0f0f0",label="dummy",style="filled"];
+		n13[fillcolor="#ff9900",fontcolor="#030303",label="podreader",style="filled"];
+		n14[label="{\"apiGroups\":[\"\"],\"resources\":[\"pods\"],\"verbs\":[\"get\",\"list\"]}\n"];
+		n12->n13;
+		n13->n14;
 		
 	}
-	n10[fillcolor="#ff9900",fontcolor="#030303",label="aws-node",style="filled"];
-	n6[fillcolor="#ff9900",fontcolor="#030303",label="cluster-admin",style="filled"];
-	n15[fillcolor="#ff9900",fontcolor="#030303",label="system:node-proxier",style="filled"];
-	n7[label="{\"apiGroups\":[\"*\"],\"resources\":[\"*\"],\"verbs\":[\"*\"]}\n{\"nonResourceURLs\":[\"*\"],\"verbs\":[\"*\"]}\n"];
-	n11[label="{\"apiGroups\":[\"crd.k8s.amazonaws.com\"],\"resources\":[\"*\",\"namespaces\"],\"verbs\":[\"*\"]}\n{\"apiGroups\":[\"\"],\"resources\":[\"pods\",\"nodes\",\"namespaces\"],\"verbs\":[\"list\",\"watch\",\"get\"]}\n{\"apiGroups\":[\"extensions\"],\"resources\":[\"daemonsets\"],\"verbs\":[\"list\",\"watch\"]}\n"];
-	n9->n10;
-	n10->n11;
-	n6->n7;
+	n2[fillcolor="#ff9900",fontcolor="#030303",label="(CLUSTER) ROLE",style="filled"];
+	n3[label="ACCESS RULES"];
+	n1[fillcolor="#2f6de1",fontcolor="#f0f0f0",label="SERVICE ACCOUNT",style="filled"];
+	n5[fillcolor="#ff9900",fontcolor="#030303",label="aws-node",style="filled"];
+	n20[fillcolor="#ff9900",fontcolor="#030303",label="cluster-admin",style="filled"];
+	n10[fillcolor="#ff9900",fontcolor="#030303",label="system:node-proxier",style="filled"];
+	n21[label="{\"apiGroups\":[\"*\"],\"resources\":[\"*\"],\"verbs\":[\"*\"]}\n{\"nonResourceURLs\":[\"*\"],\"verbs\":[\"*\"]}\n"];
+	n6[label="{\"apiGroups\":[\"crd.k8s.amazonaws.com\"],\"resources\":[\"*\",\"namespaces\"],\"verbs\":[\"*\"]}\n{\"apiGroups\":[\"\"],\"resources\":[\"pods\",\"nodes\",\"namespaces\"],\"verbs\":[\"list\",\"watch\",\"get\"]}\n{\"apiGroups\":[\"extensions\"],\"resources\":[\"daemonsets\"],\"verbs\":[\"list\",\"watch\"]}\n"];
+	n2->n3;
+	n1->n2;
+	n4->n5;
 	n5->n6;
-	n14->n15;
+	n20->n21;
+	n19->n20;
+	n9->n10;
 	
 }

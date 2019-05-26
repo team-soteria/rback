@@ -276,6 +276,13 @@ func lookupResources(namespace, role string, p Permissions) (resources string, e
 
 func genGraph(p Permissions) *dot.Graph {
 	g := dot.NewGraph(dot.Directed)
+	// legend:
+	las := g.Node("SERVICE ACCOUNT").Attr("style", "filled").Attr("fillcolor", "#2f6de1").Attr("fontcolor", "#f0f0f0")
+	lr := g.Node("(CLUSTER) ROLE").Attr("style", "filled").Attr("fillcolor", "#ff9900").Attr("fontcolor", "#030303")
+	lac := g.Node("ACCESS RULES")
+	g.Edge(las, lr)
+	g.Edge(lr, lac)
+
 	for ns, serviceaccounts := range p.ServiceAccounts {
 		gns := g.Subgraph(ns, dot.ClusterOption{})
 		for _, sa := range serviceaccounts {

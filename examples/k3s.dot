@@ -1,40 +1,45 @@
 digraph  {
-	subgraph cluster_s0 {
-		ID = "cluster_s0";
-		label="default";
-		n1[fillcolor="#2f6de1",fontcolor="#f0f0f0",label="default",style="filled"];
-		
-	}subgraph cluster_s1 {
+	subgraph cluster_s1 {
 		ID = "cluster_s1";
-		label="kube-node-lease";
-		n2[fillcolor="#2f6de1",fontcolor="#f0f0f0",label="default",style="filled"];
+		label="default";
+		n5[fillcolor="#2f6de1",fontcolor="#f0f0f0",label="default",style="filled"];
 		
 	}subgraph cluster_s2 {
 		ID = "cluster_s2";
-		label="kube-public";
-		n3[fillcolor="#2f6de1",fontcolor="#f0f0f0",label="default",style="filled"];
+		label="kube-node-lease";
+		n6[fillcolor="#2f6de1",fontcolor="#f0f0f0",label="default",style="filled"];
 		
 	}subgraph cluster_s3 {
 		ID = "cluster_s3";
-		label="kube-system";
-		n4[fillcolor="#2f6de1",fontcolor="#f0f0f0",label="coredns",style="filled"];
-		n5[fillcolor="#2f6de1",fontcolor="#f0f0f0",label="default",style="filled"];
-		n6[fillcolor="#2f6de1",fontcolor="#f0f0f0",label="helm-traefik",style="filled"];
-		n9[fillcolor="#2f6de1",fontcolor="#f0f0f0",label="traefik",style="filled"];
+		label="kube-public";
+		n7[fillcolor="#2f6de1",fontcolor="#f0f0f0",label="default",style="filled"];
 		
 	}subgraph cluster_s4 {
 		ID = "cluster_s4";
+		label="kube-system";
+		n8[fillcolor="#2f6de1",fontcolor="#f0f0f0",label="coredns",style="filled"];
+		n9[fillcolor="#2f6de1",fontcolor="#f0f0f0",label="default",style="filled"];
+		n10[fillcolor="#2f6de1",fontcolor="#f0f0f0",label="helm-traefik",style="filled"];
+		n13[fillcolor="#2f6de1",fontcolor="#f0f0f0",label="traefik",style="filled"];
+		
+	}subgraph cluster_s0 {
+		ID = "cluster_s0";
 		label="test";
-		n12[fillcolor="#2f6de1",fontcolor="#f0f0f0",label="default",style="filled"];
+		n4[fillcolor="#2f6de1",fontcolor="#f0f0f0",label="default",style="filled"];
 		
 	}
-	n7[fillcolor="#ff9900",fontcolor="#030303",label="cluster-admin",style="filled"];
-	n10[fillcolor="#ff9900",fontcolor="#030303",label="traefik",style="filled"];
-	n11[label="{\"apiGroups\":[\"\"],\"resources\":[\"pods\",\"services\",\"endpoints\",\"secrets\"],\"verbs\":[\"get\",\"list\",\"watch\"]}\n{\"apiGroups\":[\"extensions\"],\"resources\":[\"ingresses\"],\"verbs\":[\"get\",\"list\",\"watch\"]}\n{\"apiGroups\":[\"extensions\"],\"resources\":[\"ingresses/status\"],\"verbs\":[\"update\"]}\n"];
-	n8[label="{\"apiGroups\":[\"*\"],\"resources\":[\"*\"],\"verbs\":[\"*\"]}\n{\"nonResourceURLs\":[\"*\"],\"verbs\":[\"*\"]}\n"];
-	n7->n8;
-	n6->n7;
-	n9->n10;
+	n2[fillcolor="#ff9900",fontcolor="#030303",label="(CLUSTER) ROLE",style="filled"];
+	n3[label="ACCESS RULES"];
+	n1[fillcolor="#2f6de1",fontcolor="#f0f0f0",label="SERVICE ACCOUNT",style="filled"];
+	n11[fillcolor="#ff9900",fontcolor="#030303",label="cluster-admin",style="filled"];
+	n14[fillcolor="#ff9900",fontcolor="#030303",label="traefik",style="filled"];
+	n15[label="{\"apiGroups\":[\"\"],\"resources\":[\"pods\",\"services\",\"endpoints\",\"secrets\"],\"verbs\":[\"get\",\"list\",\"watch\"]}\n{\"apiGroups\":[\"extensions\"],\"resources\":[\"ingresses\"],\"verbs\":[\"get\",\"list\",\"watch\"]}\n{\"apiGroups\":[\"extensions\"],\"resources\":[\"ingresses/status\"],\"verbs\":[\"update\"]}\n"];
+	n12[label="{\"apiGroups\":[\"*\"],\"resources\":[\"*\"],\"verbs\":[\"*\"]}\n{\"nonResourceURLs\":[\"*\"],\"verbs\":[\"*\"]}\n"];
+	n2->n3;
+	n1->n2;
+	n11->n12;
 	n10->n11;
+	n13->n14;
+	n14->n15;
 	
 }

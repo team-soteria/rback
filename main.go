@@ -248,7 +248,8 @@ func lookupResources(namespace, role string, p Permissions) (resources string, e
 			rules := d["rules"].([]interface{})
 			for _, rule := range rules {
 				r := rule.(map[string]interface{})
-				resources += fmt.Sprintf("%v", r)
+				rj, _ := struct2json(r)
+				resources += fmt.Sprintf("%v\n", rj)
 			}
 		}
 	}

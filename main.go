@@ -28,86 +28,177 @@ func main() {
 	fmt.Println(g.String())
 }
 
+// getServiceAccounts retrieves data about service accounts across all namespaces
+func getServiceAccounts() (serviceAccounts map[string][]string, err error) {
+	serviceAccounts = make(map[string][]string)
+	res, err := kubecuddler.Kubectl(true, true, "", "get", "sa", "--all-namespaces", "--output", "json")
+	if err != nil {
+		return serviceAccounts, err
+	}
+	var d map[string]interface{}
+	b := []byte(res)
+	err = json.Unmarshal(b, &d)
+	if err != nil {
+		return serviceAccounts, err
+	}
+	saitems := d["items"].([]interface{})
+	for _, sa := range saitems {
+		serviceaccount := sa.(map[string]interface{})
+		metadata := serviceaccount["metadata"].(map[string]interface{})
+		ns := metadata["namespace"]
+		name := metadata["name"]
+		serviceAccounts[ns.(string)] = append(serviceAccounts[ns.(string)], name.(string))
+	}
+	return serviceAccounts, nil
+}
+
+// getRoles retrieves data about roles across all namespaces
+func getRoles() (roles map[string][]string, err error) {
+	roles = make(map[string][]string)
+	res, err := kubecuddler.Kubectl(true, true, "", "get", "roles", "--all-namespaces", "--output", "json")
+	if err != nil {
+		return roles, err
+	}
+	var d map[string]interface{}
+	b := []byte(res)
+	err = json.Unmarshal(b, &d)
+	if err != nil {
+		return roles, err
+	}
+	roleitems := d["items"].([]interface{})
+	for _, ri := range roleitems {
+		role := ri.(map[string]interface{})
+		metadata := role["metadata"].(map[string]interface{})
+		ns := metadata["namespace"]
+		rj, _ := struct2json(role)
+		roles[ns.(string)] = append(roles[ns.(string)], rj)
+	}
+	return roles, nil
+}
+
+// getRoleBindings retrieves data about roles across all namespaces
+func getRoleBindings() (rolebindings map[string][]string, err error) {
+	rolebindings = make(map[string][]string)
+	res, err := kubecuddler.Kubectl(true, true, "", "get", "rolebindings", "--all-namespaces", "--output", "json")
+	if err != nil {
+		return rolebindings, err
+	}
+	var d map[string]interface{}
+	b := []byte(res)
+	err = json.Unmarshal(b, &d)
+	if err != nil {
+		return rolebindings, err
+	}
+	rbitems := d["items"].([]interface{})
+	for _, rbi := range rbitems {
+		rolebinding := rbi.(map[string]interface{})
+		metadata := rolebinding["metadata"].(map[string]interface{})
+		ns := metadata["namespace"]
+		rbj, _ := struct2json(rolebinding)
+		rolebindings[ns.(string)] = append(rolebindings[ns.(string)], rbj)
+	}
+	return rolebindings, nil
+}
+
+// getClusterRoles retrieves data about cluster roles
+func getClusterRoles() (croles []string, err error) {
+	croles = []string{}
+	res, err := kubecuddler.Kubectl(true, true, "", "get", "clusterroles", "--output", "json")
+	if err != nil {
+		return croles, err
+	}
+	var d map[string]interface{}
+	b := []byte(res)
+	err = json.Unmarshal(b, &d)
+	if err != nil {
+		return croles, err
+	}
+	croleitems := d["items"].([]interface{})
+	for _, cri := range croleitems {
+		crole := cri.(map[string]interface{})
+		metadata := crole["metadata"].(map[string]interface{})
+		name := metadata["name"]
+		if !strings.HasPrefix(name.(string), "system:") {
+			crj, _ := struct2json(crole)
+			croles = append(croles, crj)
+		}
+	}
+	return croles, nil
+}
+
+// getClusterRoleBindings retrieves data about cluster role bindings
+func getClusterRoleBindings() (crolebindings []string, err error) {
+	crolebindings = []string{}
+	res, err := kubecuddler.Kubectl(true, true, "", "get", "clusterrolebindings", "--output", "json")
+	if err != nil {
+		return crolebindings, err
+	}
+	var d map[string]interface{}
+	b := []byte(res)
+	err = json.Unmarshal(b, &d)
+	if err != nil {
+		return crolebindings, err
+	}
+	crolebindingitems := d["items"].([]interface{})
+	for _, cri := range crolebindingitems {
+		crolebinding := cri.(map[string]interface{})
+		metadata := crolebinding["metadata"].(map[string]interface{})
+		name := metadata["name"]
+		if !strings.HasPrefix(name.(string), "system:") {
+			crbj, _ := struct2json(crolebinding)
+			crolebindings = append(crolebindings, crbj)
+		}
+	}
+	return crolebindings, nil
+}
+
+// getPermissions retrieves data about all access control related data
+// from service accounts to roles and bindings, both namespaced and the
+// cluster level.
 func getPermissions() (Permissions, error) {
-	p := Permissions{
-		ServiceAccounts:     make(map[string][]string),
-		Roles:               make(map[string][]string),
-		ClusterRoles:        []string{},
-		RoleBindings:        make(map[string][]string),
-		ClusterRoleBindings: []string{},
-	}
-	// get all service accounts (namespaced):
-	res, err := kubecuddler.Kubectl(true, true, "", "get", "sa", "--all-namespaces", "--no-headers")
+	p := Permissions{}
+	sa, err := getServiceAccounts()
 	if err != nil {
-		return p, err
+ 		return p, err
 	}
-	for _, r := range strings.Split(res, "\n") {
-		f := strings.Fields(r)
-		p.ServiceAccounts[f[0]] = append(p.ServiceAccounts[f[0]], f[1])
-	}
-	// get all roles (namespaced):
-	res, err = kubecuddler.Kubectl(true, true, "", "get", "roles", "--all-namespaces", "--no-headers")
+	p.ServiceAccounts = sa 
+	roles, err := getRoles()
 	if err != nil {
-		return p, err
+ 		return p, err
 	}
-	for _, r := range strings.Split(res, "\n") {
-		f := strings.Fields(r)
-		p.Roles[f[0]] = append(p.Roles[f[0]], f[1])
-	}
-	// get all cluster roles:
-	res, err = kubecuddler.Kubectl(true, true, "", "get", "clusterroles", "--no-headers")
+	p.Roles = roles
+	rb, err := getRoleBindings()
 	if err != nil {
-		return p, err
+ 		return p, err
 	}
-	for _, r := range strings.Split(res, "\n") {
-		f := strings.Fields(r)
-		if !strings.HasPrefix(f[0], "system:") {
-			p.ClusterRoles = append(p.ClusterRoles, f[0])
-		}
-	}
-	// get all rolebindings (namespaced):
-	res, err = kubecuddler.Kubectl(true, true, "", "get", "rolebindings", "--all-namespaces", "--no-headers")
+	p.RoleBindings = rb
+	cr, err := getClusterRoles()
 	if err != nil {
-		return p, err
+ 		return p, err
 	}
-	for _, r := range strings.Split(res, "\n") {
-		f := strings.Fields(r)
-		p.RoleBindings[f[0]] = append(p.RoleBindings[f[0]], f[1])
-	}
-	// get all cluster role bindings:
-	res, err = kubecuddler.Kubectl(true, true, "", "get", "clusterrolebindings", "--no-headers")
+	p.ClusterRoles = cr
+	crb, err := getClusterRoleBindings()
 	if err != nil {
-		return p, err
+ 		return p, err
 	}
-	for _, r := range strings.Split(res, "\n") {
-		f := strings.Fields(r)
-		if !strings.HasPrefix(f[0], "system:") {
-			p.ClusterRoleBindings = append(p.ClusterRoleBindings, f[0])
-		}
-	}
+	p.ClusterRoleBindings = crb
 	return p, nil
 }
 
+// lookupRoles lists roles in a namespace for a given service account
 func lookupRoles(namespace, sa string, p Permissions) (roles []string, err error) {
 	for _, rb := range p.RoleBindings[namespace] {
-		res, err := kubecuddler.Kubectl(true, true, "", "--namespace", namespace, "get", "rolebinding", rb, "--output", "json")
-		if err != nil {
-			return roles, err
-		}
 		var d map[string]interface{}
-		b := []byte(res)
+		b := []byte(rb)
 		err = json.Unmarshal(b, &d)
 		if err != nil {
 			return roles, err
 		}
 		roleRef := d["roleRef"].(map[string]interface{})
 		r := roleRef["name"].(string)
-		// fmt.Fprintf(os.Stderr, "checking role %v", role)
 		subjects := d["subjects"].([]interface{})
-		// fmt.Println(subjects)
 		for _, subject := range subjects {
 			s := subject.(map[string]interface{})
-			// fmt.Fprintf(os.Stderr, "subject: %v", s)
 			if s["name"] == sa {
 				roles = append(roles, r)
 			}
@@ -116,26 +207,20 @@ func lookupRoles(namespace, sa string, p Permissions) (roles []string, err error
 	return roles, nil
 }
 
+// lookupClusterRoles lists cluster roles for a given service account
 func lookupClusterRoles(sa string, p Permissions) (clusterroles []string, err error) {
 	for _, crb := range p.ClusterRoleBindings {
-		res, err := kubecuddler.Kubectl(true, true, "", "get", "clusterrolebinding", crb, "--output", "json")
-		if err != nil {
-			return clusterroles, err
-		}
 		var d map[string]interface{}
-		b := []byte(res)
+		b := []byte(crb)
 		err = json.Unmarshal(b, &d)
 		if err != nil {
 			return clusterroles, err
 		}
 		roleRef := d["roleRef"].(map[string]interface{})
 		r := roleRef["name"].(string)
-		// fmt.Fprintf(os.Stderr, "checking role %v", role)
 		subjects := d["subjects"].([]interface{})
-		// fmt.Println(subjects)
 		for _, subject := range subjects {
 			s := subject.(map[string]interface{})
-			// fmt.Fprintf(os.Stderr, "subject: %v", s)
 			if s["name"] == sa {
 				clusterroles = append(clusterroles, r)
 			}
@@ -144,22 +229,21 @@ func lookupClusterRoles(sa string, p Permissions) (clusterroles []string, err er
 	return clusterroles, nil
 }
 
+// lookupResources lists resources referenced in a role.
+// if namespace is empty then the scope is cluster-wide.
 func lookupResources(namespace, role string, p Permissions) (resources string, err error) {
 	if namespace != "" {
 		return "", nil
 	}
-	res, err := kubecuddler.Kubectl(true, true, "", "get", "clusterrole", role, "--output", "json")
-	if err != nil {
-		return "", err
-	}
-	var d map[string]interface{}
-	b := []byte(res)
-	err = json.Unmarshal(b, &d)
-	if err != nil {
-		return "", err
-	}
-	rules := d["rules"].([]interface{})
-	resources = fmt.Sprintf("%v", rules)
+	// todo: iterate through p.ClusterRoles
+	// var d map[string]interface{}
+	// b := []byte(p.ClusterRoles.(string))
+	// err = json.Unmarshal(b, &d)
+	// if err != nil {
+	// 	return "", err
+	// }
+	// rules := d["rules"].([]interface{})
+	// resources = fmt.Sprintf("%v", rules)
 	return resources, nil
 }
 
@@ -175,17 +259,26 @@ func genGraph(p Permissions) *dot.Graph {
 				os.Exit(-2)
 			}
 			for _, role := range roles {
-				res, err := lookupResources("", role, p)
-				if err != nil {
-					fmt.Printf("Can't look up entities and resources due to: %v", err)
-					os.Exit(-3)
-				}
+				// res, err := lookupResources("", role, p)
+				// if err != nil {
+				// 	fmt.Printf("Can't look up entities and resources due to: %v", err)
+				// 	os.Exit(-3)
+				// }
 				crnode := gns.Node(role).Attr("style", "filled").Attr("fillcolor", "#ff9900").Attr("fontcolor", "#030303")
-				resnode := gns.Node(res)
+				// resnode := gns.Node(res)
 				gns.Edge(sanode, crnode)
-				gns.Edge(crnode, resnode)
+				// gns.Edge(crnode, resnode)
 			}
 		}
 	}
 	return g
+}
+
+// struct2json turns a map into a JSON string
+func struct2json(s map[string]interface{})(string, error){
+	str, err := json.Marshal(s)
+	if err != nil {
+	    return "", err
+	}
+	return string(str), nil
 }

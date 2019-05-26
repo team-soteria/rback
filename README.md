@@ -50,7 +50,7 @@ Now that you have `result.dot`, you can render the graph either online or locall
 
 ### Render online
 
-There are plenty of Graphviz (`dot`) online visualization tools available, for example [http://magjac.com/graphviz-visual-editor/](http://magjac.com/graphviz-visual-editor/) or [dreampuf.github.io/GraphvizOnline](https://dreampuf.github.io/GraphvizOnline/). Head over there and paste the output of `rbac` into it.
+There are plenty of Graphviz (`dot`) online visualization tools available, for example, use [magjac.com/graphviz-visual-editor/](http://magjac.com/graphviz-visual-editor/) for interaction or the simpler [dreampuf.github.io/GraphvizOnline](https://dreampuf.github.io/GraphvizOnline/). Head over there and paste the output of `rback` into it.
 
 ### Render locally
 

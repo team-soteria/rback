@@ -1,53 +1,47 @@
 digraph  {
-	subgraph cluster_s3 {
-		ID = "cluster_s3";
+	subgraph cluster_s2 {
+		ID = "cluster_s2";
 		label="cardassian";
-		n10[fillcolor="#2f6de1",fontcolor="#f0f0f0",label="default",style="filled"];
+		n7[fillcolor="#2f6de1",fontcolor="#f0f0f0",label="default",style="filled"];
+		
+	}subgraph cluster_s3 {
+		ID = "cluster_s3";
+		label="cnat";
+		n8[fillcolor="#2f6de1",fontcolor="#f0f0f0",label="default",style="filled"];
 		
 	}subgraph cluster_s4 {
 		ID = "cluster_s4";
-		label="cnat";
-		n11[fillcolor="#2f6de1",fontcolor="#f0f0f0",label="default",style="filled"];
+		label="default";
+		n9[fillcolor="#2f6de1",fontcolor="#f0f0f0",label="default",style="filled"];
 		
 	}subgraph cluster_s5 {
 		ID = "cluster_s5";
-		label="default";
-		n12[fillcolor="#2f6de1",fontcolor="#f0f0f0",label="default",style="filled"];
+		label="kboom";
+		n12[fillcolor="#ff9900",fontcolor="#030303",label="cluster-admin",style="filled"];
+		n10[fillcolor="#2f6de1",fontcolor="#f0f0f0",label="default",style="filled"];
+		n11[fillcolor="#2f6de1",fontcolor="#f0f0f0",label="kboom-sa",style="filled"];
+		n11->n12;
 		
 	}subgraph cluster_s6 {
 		ID = "cluster_s6";
-		label="kboom";
-		n16[label="[map[apiGroups:[*] resources:[*] verbs:[*]] map[nonResourceURLs:[*] verbs:[*]]]"];
-		n15[fillcolor="#ff9900",fontcolor="#030303",label="cluster-admin",style="filled"];
+		label="kube-public";
 		n13[fillcolor="#2f6de1",fontcolor="#f0f0f0",label="default",style="filled"];
-		n14[fillcolor="#2f6de1",fontcolor="#f0f0f0",label="kboom-sa",style="filled"];
-		n15->n16;
-		n14->n15;
 		
 	}subgraph cluster_s0 {
 		ID = "cluster_s0";
-		label="kube-public";
-		n1[fillcolor="#2f6de1",fontcolor="#f0f0f0",label="default",style="filled"];
+		label="kube-system";
+		n1[fillcolor="#ff9900",fontcolor="#030303",label="aws-node",style="filled"];
+		n2[fillcolor="#2f6de1",fontcolor="#f0f0f0",label="coredns",style="filled"];
+		n3[fillcolor="#2f6de1",fontcolor="#f0f0f0",label="default",style="filled"];
+		n4[fillcolor="#2f6de1",fontcolor="#f0f0f0",label="kube-proxy",style="filled"];
+		n5[fillcolor="#ff9900",fontcolor="#030303",label="system:node-proxier",style="filled"];
+		n1->n1;
+		n4->n5;
 		
 	}subgraph cluster_s1 {
 		ID = "cluster_s1";
-		label="kube-system";
-		n8[label="[map[apiGroups:[] resources:[endpoints services] verbs:[list watch]] map[apiGroups:[] resources:[nodes] verbs:[get]] map[apiGroups:[] resources:[events] verbs:[create patch update]]]"];
-		n3[label="[map[apiGroups:[crd.k8s.amazonaws.com] resources:[* namespaces] verbs:[*]] map[apiGroups:[] resources:[pods nodes namespaces] verbs:[list watch get]] map[apiGroups:[extensions] resources:[daemonsets] verbs:[list watch]]]"];
-		n2[fillcolor="#ff9900",fontcolor="#030303",label="aws-node",style="filled"];
-		n4[fillcolor="#2f6de1",fontcolor="#f0f0f0",label="coredns",style="filled"];
-		n5[fillcolor="#2f6de1",fontcolor="#f0f0f0",label="default",style="filled"];
-		n6[fillcolor="#2f6de1",fontcolor="#f0f0f0",label="kube-proxy",style="filled"];
-		n7[fillcolor="#ff9900",fontcolor="#030303",label="system:node-proxier",style="filled"];
-		n2->n2;
-		n2->n3;
-		n6->n7;
-		n7->n8;
-		
-	}subgraph cluster_s2 {
-		ID = "cluster_s2";
 		label="rback";
-		n9[fillcolor="#2f6de1",fontcolor="#f0f0f0",label="default",style="filled"];
+		n6[fillcolor="#2f6de1",fontcolor="#f0f0f0",label="default",style="filled"];
 		
 	}
 	

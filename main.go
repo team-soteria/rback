@@ -235,15 +235,16 @@ func lookupResources(namespace, role string, p Permissions) (resources string, e
 	if namespace != "" {
 		return "", nil
 	}
-	// todo: iterate through p.ClusterRoles
-	// var d map[string]interface{}
-	// b := []byte(p.ClusterRoles.(string))
-	// err = json.Unmarshal(b, &d)
-	// if err != nil {
-	// 	return "", err
-	// }
-	// rules := d["rules"].([]interface{})
-	// resources = fmt.Sprintf("%v", rules)
+	for _, cr := range p.ClusterRoles {	
+	var d map[string]interface{}
+	b := []byte(cr)
+	err = json.Unmarshal(b, &d)
+	if err != nil {
+		return "", err
+	}
+	rules := d["rules"].([]interface{})
+	resources = fmt.Sprintf("%v", rules)
+	}
 	return resources, nil
 }
 
@@ -259,21 +260,21 @@ func genGraph(p Permissions) *dot.Graph {
 				os.Exit(-2)
 			}
 			for _, role := range roles {
-				// res, err := lookupResources("", role, p)
-				// if err != nil {
-				// 	fmt.Printf("Can't look up entities and resources due to: %v", err)
-				// 	os.Exit(-3)
-				// }
+				res, err := lookupResources("", role, p)
+				if err != nil {
+					fmt.Printf("Can't look up entities and resources due to: %v", err)
+					os.Exit(-3)
+				}
 				crnode := gns.Node(role).Attr("style", "filled").Attr("fillcolor", "#ff9900").Attr("fontcolor", "#030303")
-				// resnode := gns.Node(res)
+				resnode := gns.Node(res)
 				gns.Edge(sanode, crnode)
-				// gns.Edge(crnode, resnode)
+				gns.Edge(crnode, resnode)
 			}
 		}
 	}
 	return g
 }
-
+ 
 // struct2json turns a map into a JSON string
 func struct2json(s map[string]interface{})(string, error){
 	str, err := json.Marshal(s)

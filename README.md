@@ -12,12 +12,26 @@ Another example would be a local K3S cluster:
 
 ## Install
 
-Dependencies:
+`rback` depends on you having access to a Kubernetes cluster, either in the cloud (like Amazon EKS)
+or locally (k3s, kind, Minikube, Docker for Desktop) as well as  `kubectl` installed and configured, locally.
 
-- Access to a Kubernetes cluster
-- `kubectl` installed and configured
 
-For now, no binaries, use from source with Go 1.12:
+To install it for macOS, do:
+
+```sh
+$ curl -sL https://github.com/mhausenblas/rback/releases/download/0.1.0/macos_rback -o rback
+$ chmod +x rback && sudo mv rback /usr/local/bin
+```
+
+To install it for Linux, do:
+
+```sh
+$ curl -sL https://github.com/mhausenblas/rback/releases/download/0.1.0/linux_rback -o rback
+$ chmod +x rback && sudo mv rback /usr/local/bin
+```
+
+
+You can also build it from source, with Go 1.12 like so:
 
 ```sh
 $ git clone https://github.com/mhausenblas/rback.git && cd rback

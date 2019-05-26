@@ -236,14 +236,21 @@ func lookupResources(namespace, role string, p Permissions) (resources string, e
 		return "", nil
 	}
 	for _, cr := range p.ClusterRoles {	
-	var d map[string]interface{}
-	b := []byte(cr)
-	err = json.Unmarshal(b, &d)
-	if err != nil {
-		return "", err
-	}
-	rules := d["rules"].([]interface{})
-	resources = fmt.Sprintf("%v", rules)
+		var d map[string]interface{}
+		b := []byte(cr)
+		err = json.Unmarshal(b, &d)
+		if err != nil {
+			return "", err
+		}
+		metadata := d["metadata"].(map[string]interface{})
+		crname := metadata["name"]
+		if crname == role {
+			rules := d["rules"].([]interface{})
+			for _, rule := range rules {
+				r := rule.(map[string]interface{})
+				resources += fmt.Sprintf("%v", r)
+			}
+		}
 	}
 	return resources, nil
 }
@@ -260,15 +267,18 @@ func genGraph(p Permissions) *dot.Graph {
 				os.Exit(-2)
 			}
 			for _, role := range roles {
+				crnode := gns.Node(role).Attr("style", "filled").Attr("fillcolor", "#ff9900").Attr("fontcolor", "#030303")
+				gns.Edge(sanode, crnode)
+
 				res, err := lookupResources("", role, p)
 				if err != nil {
 					fmt.Printf("Can't look up entities and resources due to: %v", err)
 					os.Exit(-3)
 				}
-				crnode := gns.Node(role).Attr("style", "filled").Attr("fillcolor", "#ff9900").Attr("fontcolor", "#030303")
-				resnode := gns.Node(res)
-				gns.Edge(sanode, crnode)
-				gns.Edge(crnode, resnode)
+				if res != "" {
+					resnode := gns.Node(res)
+					gns.Edge(crnode, resnode)
+				}
 			}
 		}
 	}

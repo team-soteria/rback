@@ -1,4 +1,4 @@
-rback_version := 0.1
+rback_version := 0.1.0
 
 .PHONY: build clean
 

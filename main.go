@@ -287,17 +287,16 @@ func genGraph(p Permissions) *dot.Graph {
 				os.Exit(-2)
 			}
 			for _, crole := range croles {
-				crnode := gns.Node(crole).Attr("style", "filled").Attr("fillcolor", "#ff9900").Attr("fontcolor", "#030303")
-				gns.Edge(sanode, crnode)
-
+				crnode := g.Node(crole).Attr("style", "filled").Attr("fillcolor", "#ff9900").Attr("fontcolor", "#030303")
+				g.Edge(sanode, crnode)
 				res, err := lookupResources("", crole, p)
 				if err != nil {
 					fmt.Printf("Can't look up entities and resources due to: %v", err)
 					os.Exit(-3)
 				}
 				if res != "" {
-					resnode := gns.Node(res)
-					gns.Edge(crnode, resnode)
+					resnode := g.Node(res)
+					g.Edge(crnode, resnode)
 				}
 			}
 			// roles:
@@ -309,7 +308,6 @@ func genGraph(p Permissions) *dot.Graph {
 			for _, role := range roles {
 				crnode := gns.Node(role).Attr("style", "filled").Attr("fillcolor", "#ff9900").Attr("fontcolor", "#030303")
 				gns.Edge(sanode, crnode)
-
 				res, err := lookupResources(ns, role, p)
 				if err != nil {
 					fmt.Printf("Can't look up entities and resources due to: %v", err)

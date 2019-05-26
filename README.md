@@ -40,12 +40,17 @@ $ go build
 
 ## Usage
 
-Run `rback` locally against the target cluster and store its output in a `.dot` file. Then you can render the graph either online or locally.
+Run `rback` locally against the target cluster and store its output in a `.dot` file like shown in the following:
+
+```sh
+$ rback > result.dot
+```
+
+Now that you have `result.dot`, you can render the graph either online or locally.
 
 ### Render online
 
-There are plenty of Graphviz (`dot`) online visualization tools available, for example [dreampuf.github.io/GraphvizOnline](https://dreampuf.github.io/GraphvizOnline/). Head over there and paste the output of `rbac` into it
-.
+There are plenty of Graphviz (`dot`) online visualization tools available, for example [http://magjac.com/graphviz-visual-editor/](http://magjac.com/graphviz-visual-editor/) or [dreampuf.github.io/GraphvizOnline](https://dreampuf.github.io/GraphvizOnline/). Head over there and paste the output of `rbac` into it.
 
 ### Render locally
 
@@ -57,7 +62,7 @@ $ rback | dot -Tpng  > /tmp/rback.png && open /tmp/rback.png
 
 ## Background
 
-How it works is that `rback` issues the following five queries:
+How it works is that `rback` issues the following five queries by shelling out to `kubectl`:
 
 ```sh
 kubectl get sa --all-namespaces --output json
@@ -67,4 +72,4 @@ kubectl get clusterroles --output json
 kubectl get clusterrolebindings --output json
 ```
 
-Based on this information, the graphs are created.
+Then, based on this information, the graphs are created using the [github.com/emicklei/dot](https://github.com/emicklei/dot) package.

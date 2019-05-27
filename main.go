@@ -201,9 +201,9 @@ func (r *Rback) getPermissions() (Permissions, error) {
 	return p, nil
 }
 
-// lookupRoles lists roles in a namespace for a given service account
-func (r *Rback) lookupRoles(namespace, sa string, p Permissions) (roles []string, err error) {
-	for _, rb := range p.RoleBindings[namespace] {
+// lookupRoles lists roles for a given service account
+func (r *Rback) lookupRoles(bindings []string, sa string) (roles []string, err error) {
+	for _, rb := range bindings {
 		var d map[string]interface{}
 		b := []byte(rb)
 		err = json.Unmarshal(b, &d)
@@ -223,31 +223,6 @@ func (r *Rback) lookupRoles(namespace, sa string, p Permissions) (roles []string
 		}
 	}
 	return roles, nil
-}
-
-// lookupClusterRoles lists cluster roles for a given service account
-func (r *Rback) lookupClusterRoles(sa string, p Permissions) (clusterroles []string, err error) {
-	for _, crb := range p.ClusterRoleBindings {
-		var d map[string]interface{}
-		b := []byte(crb)
-		err = json.Unmarshal(b, &d)
-		if err != nil {
-			return clusterroles, err
-		}
-		roleRef := d["roleRef"].(map[string]interface{})
-		r := roleRef["name"].(string)
-		if d["subjects"] != nil {
-			subjects := d["subjects"].([]interface{})
-			for _, subject := range subjects {
-				s := subject.(map[string]interface{})
-				if s["name"] == sa {
-					clusterroles = append(clusterroles, r)
-				}
-			}
-		}
-
-	}
-	return clusterroles, nil
 }
 
 // lookupResources lists resources referenced in a role.
@@ -322,7 +297,7 @@ func (r *Rback) genGraph(p Permissions) *dot.Graph {
 				Attr("fillcolor", "#2f6de1").
 				Attr("fontcolor", "#f0f0f0")
 			// cluster roles:
-			croles, err := r.lookupClusterRoles(sa, p)
+			croles, err := r.lookupRoles(p.ClusterRoleBindings, sa)
 			if err != nil {
 				fmt.Printf("Can't look up cluster roles due to: %v", err)
 				os.Exit(-2)
@@ -331,7 +306,7 @@ func (r *Rback) genGraph(p Permissions) *dot.Graph {
 				r.renderRole(g, crole, sanode, p, "")
 			}
 			// roles:
-			roles, err := r.lookupRoles(ns, sa, p)
+			roles, err := r.lookupRoles(p.RoleBindings[ns], sa)
 			if err != nil {
 				fmt.Printf("Can't look up roles due to: %v", err)
 				os.Exit(-2)

@@ -456,40 +456,45 @@ func struct2json(s map[string]interface{}) (string, error) {
 	return string(str), nil
 }
 
-func newServiceAccountNode(g *dot.Graph, id string) dot.Node {
-	return g.Node(id).
+func newServiceAccountNode(g *dot.Graph, name string) dot.Node {
+	return g.Node("sa-"+name).
 		Box().
+		Attr("label", name).
 		Attr("style", "filled").
 		Attr("fillcolor", "#2f6de1").
 		Attr("fontcolor", "#f0f0f0")
 }
 
-func newRoleBindingNode(g *dot.Graph, id string) dot.Node {
-	return g.Node(id).
+func newRoleBindingNode(g *dot.Graph, name string) dot.Node {
+	return g.Node("rb-"+name).
+		Attr("label", name).
 		Attr("shape", "octagon").
 		Attr("style", "filled").
 		Attr("fillcolor", "#ffcc00").
 		Attr("fontcolor", "#030303")
 }
 
-func newClusterRoleBindingNode(g *dot.Graph, id string) dot.Node {
-	return g.Node(id).
+func newClusterRoleBindingNode(g *dot.Graph, name string) dot.Node {
+	return g.Node("crb-"+name).
+		Attr("label", name).
 		Attr("shape", "doubleoctagon").
 		Attr("style", "filled").
 		Attr("fillcolor", "#ffcc00").
 		Attr("fontcolor", "#030303")
 }
 
-func newRoleNode(g *dot.Graph, id string) dot.Node {
-	return g.Node(id).
+func newRoleNode(g *dot.Graph, name string) dot.Node {
+	return g.Node("r-"+name).
+		Attr("label", name).
 		Attr("shape", "octagon").
 		Attr("style", "filled").
 		Attr("fillcolor", "#ff9900").
 		Attr("fontcolor", "#030303")
 }
 
-func newClusterRoleNode(g *dot.Graph, id string) dot.Node {
-	return g.Node(id).
+func newClusterRoleNode(g *dot.Graph, name string) dot.Node {
+	return g.Node("cr-"+name).
+		Attr("label", name).
 		Attr("shape", "doubleoctagon").
 		Attr("style", "filled").
 		Attr("fillcolor", "#ff9900").

@@ -298,8 +298,15 @@ func (r *Rback) lookupResources(namespace, role string, p Permissions) (resource
 func (r *Rback) genGraph(p Permissions) *dot.Graph {
 	g := dot.NewGraph(dot.Directed)
 	// legend:
-	las := g.Node("SERVICE ACCOUNT").Attr("style", "filled").Attr("fillcolor", "#2f6de1").Attr("fontcolor", "#f0f0f0")
-	lr := g.Node("(CLUSTER) ROLE").Attr("style", "filled").Attr("fillcolor", "#ff9900").Attr("fontcolor", "#030303")
+	las := g.Node("SERVICE ACCOUNT").
+		Box().
+		Attr("style", "filled").
+		Attr("fillcolor", "#2f6de1").
+		Attr("fontcolor", "#f0f0f0")
+	lr := g.Node("(CLUSTER) ROLE").
+		Attr("style", "filled").
+		Attr("fillcolor", "#ff9900").
+		Attr("fontcolor", "#030303")
 	g.Edge(las, lr)
 	if r.config.renderRules {
 		lac := g.Node("ACCESS RULES")
@@ -309,7 +316,11 @@ func (r *Rback) genGraph(p Permissions) *dot.Graph {
 	for ns, serviceaccounts := range p.ServiceAccounts {
 		gns := g.Subgraph(ns, dot.ClusterOption{})
 		for _, sa := range serviceaccounts {
-			sanode := gns.Node(sa).Attr("style", "filled").Attr("fillcolor", "#2f6de1").Attr("fontcolor", "#f0f0f0")
+			sanode := gns.Node(sa).
+				Box().
+				Attr("style", "filled").
+				Attr("fillcolor", "#2f6de1").
+				Attr("fontcolor", "#f0f0f0")
 			// cluster roles:
 			croles, err := r.lookupClusterRoles(sa, p)
 			if err != nil {

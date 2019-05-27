@@ -211,20 +211,20 @@ func (r *Rback) getPermissions() (Permissions, error) {
 // lookupRoles lists roles for a given service account
 func (r *Rback) lookupRoles(bindings []string, sa string) (roles []string, err error) {
 	for _, rb := range bindings {
-		var d map[string]interface{}
+		var binding map[string]interface{}
 		b := []byte(rb)
-		err = json.Unmarshal(b, &d)
+		err = json.Unmarshal(b, &binding)
 		if err != nil {
 			return roles, err
 		}
-		roleRef := d["roleRef"].(map[string]interface{})
-		r := roleRef["name"].(string)
-		if d["subjects"] != nil {
-			subjects := d["subjects"].([]interface{})
+		roleRef := binding["roleRef"].(map[string]interface{})
+		roleName := roleRef["name"].(string)
+		if binding["subjects"] != nil {
+			subjects := binding["subjects"].([]interface{})
 			for _, subject := range subjects {
 				s := subject.(map[string]interface{})
 				if s["name"] == sa {
-					roles = append(roles, r)
+					roles = append(roles, roleName)
 				}
 			}
 		}
@@ -347,12 +347,12 @@ func (r *Rback) renderLegend(g *dot.Graph) {
 	namespace := legend.Subgraph("Namespace", dot.ClusterOption{})
 	namespace.Attr("style", "dashed")
 
-	las := newServiceAccountNode(namespace, "ServiceAccount")
-	lr := newRoleNode(namespace, "(Cluster)Role")
-	legend.Edge(las, lr)
+	sa := newServiceAccountNode(namespace, "ServiceAccount")
+	role := newRoleNode(namespace, "(Cluster)Role")
+	legend.Edge(sa, role)
 	if r.config.renderRules {
-		lac := newRulesNode(namespace, "Access rules")
-		legend.Edge(lr, lac)
+		rules := newRulesNode(namespace, "Access rules")
+		legend.Edge(role, rules)
 	}
 }
 

@@ -343,11 +343,15 @@ func (r *Rback) genGraph(p Permissions) *dot.Graph {
 
 func (r *Rback) renderLegend(g *dot.Graph) {
 	legend := g.Subgraph("LEGEND", dot.ClusterOption{})
-	las := newServiceAccountNode(legend, "SERVICE ACCOUNT")
-	lr := newRoleNode(legend, "(CLUSTER) ROLE")
+
+	namespace := legend.Subgraph("Namespace", dot.ClusterOption{})
+	namespace.Attr("style", "dashed")
+
+	las := newServiceAccountNode(namespace, "SERVICE ACCOUNT")
+	lr := newRoleNode(namespace, "(CLUSTER) ROLE")
 	legend.Edge(las, lr)
 	if r.config.renderRules {
-		lac := newRulesNode(legend, "ACCESS RULES")
+		lac := newRulesNode(namespace, "ACCESS RULES")
 		legend.Edge(lr, lac)
 	}
 }

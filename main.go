@@ -502,5 +502,6 @@ func newClusterRoleNode(g *dot.Graph, namespace, name string) dot.Node {
 }
 
 func newRulesNode(g *dot.Graph, id string) dot.Node {
-	return g.Node(id)
+	return g.Node(id).
+		Attr("shape", "note")
 }

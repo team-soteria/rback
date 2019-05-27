@@ -328,20 +328,7 @@ func (r *Rback) genGraph(p Permissions) *dot.Graph {
 				os.Exit(-2)
 			}
 			for _, crole := range croles {
-				crnode := g.Node(crole).Attr("style", "filled").Attr("fillcolor", "#ff9900").Attr("fontcolor", "#030303")
-				g.Edge(sanode, crnode)
-
-				if r.config.renderRules {
-					res, err := r.lookupResources("", crole, p)
-					if err != nil {
-						fmt.Printf("Can't look up entities and resources due to: %v", err)
-						os.Exit(-3)
-					}
-					if res != "" {
-						resnode := g.Node(res)
-						g.Edge(crnode, resnode)
-					}
-				}
+				r.renderRole(g, crole, sanode, p, "")
 			}
 			// roles:
 			roles, err := r.lookupRoles(ns, sa, p)
@@ -350,25 +337,32 @@ func (r *Rback) genGraph(p Permissions) *dot.Graph {
 				os.Exit(-2)
 			}
 			for _, role := range roles {
-				crnode := gns.Node(role).Attr("style", "filled").Attr("fillcolor", "#ff9900").Attr("fontcolor", "#030303")
-				gns.Edge(sanode, crnode)
-
-				if r.config.renderRules {
-					res, err := r.lookupResources(ns, role, p)
-					if err != nil {
-						fmt.Printf("Can't look up entities and resources due to: %v", err)
-						os.Exit(-3)
-					}
-					if res != "" {
-						resnode := gns.Node(res)
-						gns.Edge(crnode, resnode)
-					}
-				}
+				r.renderRole(gns, role, sanode, p, ns)
 			}
 
 		}
 	}
 	return g
+}
+
+func (r *Rback) renderRole(g *dot.Graph, roleName string, saNode dot.Node, p Permissions, ns string) {
+	roleNode := g.Node(roleName).
+		Attr("style", "filled").
+		Attr("fillcolor", "#ff9900").
+		Attr("fontcolor", "#030303")
+	g.Edge(saNode, roleNode)
+
+	if r.config.renderRules {
+		res, err := r.lookupResources(ns, roleName, p)
+		if err != nil {
+			fmt.Printf("Can't look up entities and resources due to: %v", err)
+			os.Exit(-3)
+		}
+		if res != "" {
+			resnode := g.Node(res)
+			g.Edge(roleNode, resnode)
+		}
+	}
 }
 
 // struct2json turns a map into a JSON string

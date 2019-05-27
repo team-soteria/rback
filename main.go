@@ -16,8 +16,9 @@ type Rback struct {
 }
 
 type Config struct {
-	renderRules bool
-	namespace   string
+	renderRules    bool
+	renderBindings bool
+	namespace      string
 }
 
 type Permissions struct {
@@ -31,6 +32,7 @@ type Permissions struct {
 func main() {
 
 	config := Config{}
+	flag.BoolVar(&config.renderBindings, "render-bindings", true, "Whether to render (Cluster)RoleBindings as graph nodes")
 	flag.BoolVar(&config.renderRules, "render-rules", true, "Whether to render RBAC rules (e.g. \"get pods\") or not")
 	flag.StringVar(&config.namespace, "n", "", "The namespace to render")
 	flag.Parse()
@@ -375,13 +377,26 @@ func (r *Rback) renderLegend(g *dot.Graph) {
 	namespace.Attr("style", "dashed")
 
 	sa := newServiceAccountNode(namespace, "ServiceAccount")
+
 	role := newRoleNode(namespace, "Role")
 	clusterRoleBoundLocally := newClusterRoleNode(namespace, "ClusterRole") // bound by (namespaced!) RoleBinding
 	clusterrole := newClusterRoleNode(legend, "ClusterRole")
 
-	legend.Edge(sa, role, "RoleBinding")
-	legend.Edge(sa, clusterrole, "ClusterRoleBinding")
-	legend.Edge(sa, clusterRoleBoundLocally, "RoleBinding")
+	if r.config.renderBindings {
+		roleBinding := newRoleBindingNode(namespace, "RoleBinding")
+		sa.Edge(roleBinding).Edge(role)
+
+		roleBinding2 := newRoleBindingNode(namespace, "RoleBinding-to-ClusterRole")
+		roleBinding2.Attr("label", "RoleBinding")
+		sa.Edge(roleBinding2).Edge(clusterRoleBoundLocally)
+
+		clusterRoleBinding := newClusterRoleBindingNode(legend, "ClusterRoleBinding")
+		sa.Edge(clusterRoleBinding).Edge(clusterrole)
+	} else {
+		legend.Edge(sa, role, "RoleBinding")
+		legend.Edge(sa, clusterrole, "ClusterRoleBinding")
+		legend.Edge(sa, clusterRoleBoundLocally, "RoleBinding")
+	}
 
 	if r.config.renderRules {
 		nsrules := newRulesNode(namespace, "Namespace-scoped\naccess rules")
@@ -405,7 +420,19 @@ func (r *Rback) renderRole(g *dot.Graph, binding, role NamespacedName, saNode do
 	} else {
 		roleNode = newRoleNode(g, role.name)
 	}
-	g.Edge(saNode, roleNode, binding.name)
+
+	if r.config.renderBindings {
+		var roleBindingNode dot.Node
+		isClusterRoleBinding := binding.namespace == ""
+		if isClusterRoleBinding {
+			roleBindingNode = newClusterRoleBindingNode(g, binding.name)
+		} else {
+			roleBindingNode = newRoleBindingNode(g, binding.name)
+		}
+		saNode.Edge(roleBindingNode).Edge(roleNode)
+	} else {
+		g.Edge(saNode, roleNode, binding.name)
+	}
 
 	if r.config.renderRules {
 		res, err := r.lookupResources(binding.namespace, role.name, p)
@@ -435,6 +462,22 @@ func newServiceAccountNode(g *dot.Graph, id string) dot.Node {
 		Attr("style", "filled").
 		Attr("fillcolor", "#2f6de1").
 		Attr("fontcolor", "#f0f0f0")
+}
+
+func newRoleBindingNode(g *dot.Graph, id string) dot.Node {
+	return g.Node(id).
+		Attr("shape", "octagon").
+		Attr("style", "filled").
+		Attr("fillcolor", "#ffcc00").
+		Attr("fontcolor", "#030303")
+}
+
+func newClusterRoleBindingNode(g *dot.Graph, id string) dot.Node {
+	return g.Node(id).
+		Attr("shape", "doubleoctagon").
+		Attr("style", "filled").
+		Attr("fillcolor", "#ffcc00").
+		Attr("fontcolor", "#030303")
 }
 
 func newRoleNode(g *dot.Graph, id string) dot.Node {

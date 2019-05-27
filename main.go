@@ -351,7 +351,7 @@ func (r *Rback) genGraph(p Permissions) *dot.Graph {
 				os.Exit(-2)
 			}
 			for _, crole := range croles {
-				r.renderRole(g, crole.binding, crole.role, sanode, p, "")
+				r.renderRole(g, crole.binding, crole.role, sanode, p)
 			}
 			// roles:
 			roles, err := r.lookupBindingsAndRoles(p.RoleBindings[ns], sa)
@@ -360,7 +360,7 @@ func (r *Rback) genGraph(p Permissions) *dot.Graph {
 				os.Exit(-2)
 			}
 			for _, role := range roles {
-				r.renderRole(gns, role.binding, role.role, sanode, p, ns)
+				r.renderRole(gns, role.binding, role.role, sanode, p)
 			}
 
 		}
@@ -396,7 +396,7 @@ func (r *Rback) renderLegend(g *dot.Graph) {
 	}
 }
 
-func (r *Rback) renderRole(g *dot.Graph, binding, role NamespacedName, saNode dot.Node, p Permissions, ns string) {
+func (r *Rback) renderRole(g *dot.Graph, binding, role NamespacedName, saNode dot.Node, p Permissions) {
 	var roleNode dot.Node
 
 	isClusterRole := role.namespace == ""
@@ -408,7 +408,7 @@ func (r *Rback) renderRole(g *dot.Graph, binding, role NamespacedName, saNode do
 	g.Edge(saNode, roleNode, binding.name)
 
 	if r.config.renderRules {
-		res, err := r.lookupResources(ns, role.name, p)
+		res, err := r.lookupResources(binding.namespace, role.name, p)
 		if err != nil {
 			fmt.Printf("Can't look up entities and resources due to: %v", err)
 			os.Exit(-3)

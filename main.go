@@ -416,14 +416,14 @@ func (r *Rback) renderLegend(g *dot.Graph) {
 	}
 
 	if r.config.renderRules {
-		nsrules := newRulesNode(namespace, "Namespace-scoped\naccess rules")
+		nsrules := newRulesNode(namespace, "ns", "Role", "Namespace-scoped\naccess rules")
 		legend.Edge(role, nsrules)
 
-		nsrules2 := newRulesNode(namespace, "Namespace-scoped access rules From ClusterRole")
+		nsrules2 := newRulesNode(namespace, "ns", "ClusterRole", "Namespace-scoped access rules From ClusterRole")
 		nsrules2.Attr("label", "Namespace-scoped\naccess rules")
 		legend.Edge(clusterRoleBoundLocally, nsrules2)
 
-		clusterrules := newRulesNode(legend, "Cluster-scoped\naccess rules")
+		clusterrules := newRulesNode(legend, "", "ClusterRole", "Cluster-scoped\naccess rules")
 		legend.Edge(clusterrole, clusterrules)
 	}
 }
@@ -452,13 +452,13 @@ func (r *Rback) renderRole(g *dot.Graph, binding, role NamespacedName, saNode do
 	}
 
 	if r.config.renderRules {
-		res, err := r.lookupResources(binding.namespace, role.name, p)
+		rules, err := r.lookupResources(binding.namespace, role.name, p)
 		if err != nil {
 			fmt.Printf("Can't look up entities and resources due to: %v", err)
 			os.Exit(-3)
 		}
-		if res != "" {
-			resnode := newRulesNode(g, res)
+		if rules != "" {
+			resnode := newRulesNode(g, binding.namespace, role.name, rules)
 			g.Edge(roleNode, resnode)
 		}
 	}
@@ -518,7 +518,8 @@ func newClusterRoleNode(g *dot.Graph, namespace, name string) dot.Node {
 		Attr("fontcolor", "#030303")
 }
 
-func newRulesNode(g *dot.Graph, id string) dot.Node {
-	return g.Node(id).
+func newRulesNode(g *dot.Graph, namespace, roleName, rules string) dot.Node {
+	return g.Node("rules-"+namespace+"/"+roleName).
+		Attr("label", rules).
 		Attr("shape", "note")
 }

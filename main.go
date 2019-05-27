@@ -313,6 +313,8 @@ func (r *Rback) genGraph(p Permissions) *dot.Graph {
 
 	for ns, serviceaccounts := range p.ServiceAccounts {
 		gns := g.Subgraph(ns, dot.ClusterOption{})
+		gns.Attr("style", "dashed")
+
 		for _, sa := range serviceaccounts {
 			sanode := newServiceAccountNode(gns, sa)
 			// cluster roles:

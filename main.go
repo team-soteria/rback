@@ -347,11 +347,11 @@ func (r *Rback) renderLegend(g *dot.Graph) {
 	namespace := legend.Subgraph("Namespace", dot.ClusterOption{})
 	namespace.Attr("style", "dashed")
 
-	las := newServiceAccountNode(namespace, "SERVICE ACCOUNT")
-	lr := newRoleNode(namespace, "(CLUSTER) ROLE")
+	las := newServiceAccountNode(namespace, "ServiceAccount")
+	lr := newRoleNode(namespace, "(Cluster)Role")
 	legend.Edge(las, lr)
 	if r.config.renderRules {
-		lac := newRulesNode(namespace, "ACCESS RULES")
+		lac := newRulesNode(namespace, "Access rules")
 		legend.Edge(lr, lac)
 	}
 }

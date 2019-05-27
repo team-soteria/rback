@@ -208,8 +208,13 @@ func (r *Rback) getPermissions() (Permissions, error) {
 	return p, nil
 }
 
+type NamespacedName struct {
+	namespace string
+	name      string
+}
+
 // lookupRoles lists roles for a given service account
-func (r *Rback) lookupRoles(bindings []string, sa string) (roles []string, err error) {
+func (r *Rback) lookupRoles(bindings []string, sa string) (roles []NamespacedName, err error) {
 	for _, rb := range bindings {
 		var binding map[string]interface{}
 		b := []byte(rb)
@@ -219,12 +224,17 @@ func (r *Rback) lookupRoles(bindings []string, sa string) (roles []string, err e
 		}
 		roleRef := binding["roleRef"].(map[string]interface{})
 		roleName := roleRef["name"].(string)
+		roleNs := ""
+		if roleRef["namespace"] != nil {
+			roleNs = roleRef["namespace"].(string)
+		}
+
 		if binding["subjects"] != nil {
 			subjects := binding["subjects"].([]interface{})
 			for _, subject := range subjects {
 				s := subject.(map[string]interface{})
 				if s["name"] == sa {
-					roles = append(roles, roleName)
+					roles = append(roles, NamespacedName{roleNs, roleName})
 				}
 			}
 		}
@@ -309,6 +319,7 @@ func toString(values interface{}) string {
 
 func (r *Rback) genGraph(p Permissions) *dot.Graph {
 	g := dot.NewGraph(dot.Directed)
+	g.Attr("newrank", "true") // global rank instead of per-subgraph (ensures access rules are always in the same place (at bottom))
 	r.renderLegend(g)
 
 	for ns, serviceaccounts := range p.ServiceAccounts {
@@ -348,20 +359,40 @@ func (r *Rback) renderLegend(g *dot.Graph) {
 	namespace.Attr("style", "dashed")
 
 	sa := newServiceAccountNode(namespace, "ServiceAccount")
-	role := newRoleNode(namespace, "(Cluster)Role")
+	role := newRoleNode(namespace, "Role")
+	clusterRoleBoundLocally := newClusterRoleNode(namespace, "ClusterRole") // bound by (namespaced!) RoleBinding
+	clusterrole := newClusterRoleNode(legend, "ClusterRole")
+
 	legend.Edge(sa, role)
+	legend.Edge(sa, clusterrole)
+	legend.Edge(sa, clusterRoleBoundLocally)
+
 	if r.config.renderRules {
-		rules := newRulesNode(namespace, "Access rules")
-		legend.Edge(role, rules)
+		nsrules := newRulesNode(namespace, "Namespace-scoped\naccess rules")
+		legend.Edge(role, nsrules)
+
+		nsrules2 := newRulesNode(namespace, "Namespace-scoped access rules From ClusterRole")
+		nsrules2.Attr("label", "Namespace-scoped\naccess rules")
+		legend.Edge(clusterRoleBoundLocally, nsrules2)
+
+		clusterrules := newRulesNode(legend, "Cluster-scoped\naccess rules")
+		legend.Edge(clusterrole, clusterrules)
 	}
 }
 
-func (r *Rback) renderRole(g *dot.Graph, roleName string, saNode dot.Node, p Permissions, ns string) {
-	roleNode := newRoleNode(g, roleName)
+func (r *Rback) renderRole(g *dot.Graph, role NamespacedName, saNode dot.Node, p Permissions, ns string) {
+	var roleNode dot.Node
+
+	isClusterRole := role.namespace == ""
+	if isClusterRole {
+		roleNode = newClusterRoleNode(g, role.name)
+	} else {
+		roleNode = newRoleNode(g, role.name)
+	}
 	g.Edge(saNode, roleNode)
 
 	if r.config.renderRules {
-		res, err := r.lookupResources(ns, roleName, p)
+		res, err := r.lookupResources(ns, role.name, p)
 		if err != nil {
 			fmt.Printf("Can't look up entities and resources due to: %v", err)
 			os.Exit(-3)
@@ -392,6 +423,15 @@ func newServiceAccountNode(g *dot.Graph, id string) dot.Node {
 
 func newRoleNode(g *dot.Graph, id string) dot.Node {
 	return g.Node(id).
+		Attr("shape", "octagon").
+		Attr("style", "filled").
+		Attr("fillcolor", "#ff9900").
+		Attr("fontcolor", "#030303")
+}
+
+func newClusterRoleNode(g *dot.Graph, id string) dot.Node {
+	return g.Node(id).
+		Attr("shape", "doubleoctagon").
 		Attr("style", "filled").
 		Attr("fillcolor", "#ff9900").
 		Attr("fontcolor", "#030303")

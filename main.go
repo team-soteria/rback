@@ -249,8 +249,7 @@ func (r *Rback) lookupResources(namespace, role string, p Permissions) (resource
 				rules := d["rules"].([]interface{})
 				for _, rule := range rules {
 					r := rule.(map[string]interface{})
-					rj, _ := struct2json(r)
-					resources += fmt.Sprintf("%v\n", rj)
+					resources += toHumanReadableRule(r) + "\n"
 				}
 			}
 		}
@@ -269,12 +268,43 @@ func (r *Rback) lookupResources(namespace, role string, p Permissions) (resource
 			rules := d["rules"].([]interface{})
 			for _, rule := range rules {
 				r := rule.(map[string]interface{})
-				rj, _ := struct2json(r)
-				resources += fmt.Sprintf("%v\n", rj)
+				resources += toHumanReadableRule(r) + "\n"
 			}
 		}
 	}
 	return resources, nil
+}
+
+func toHumanReadableRule(rule map[string]interface{}) string {
+	line := toString(rule["verbs"])
+	resourceKinds := toString(rule["resources"])
+	if resourceKinds != "" {
+		line += fmt.Sprintf(` %v`, resourceKinds)
+	}
+	resourceNames := toString(rule["resourceNames"])
+	if resourceNames != "" {
+		line += fmt.Sprintf(` "%v"`, resourceNames)
+	}
+	nonResourceURLs := toString(rule["nonResourceURLs"])
+	if nonResourceURLs != "" {
+		line += fmt.Sprintf(` %v`, nonResourceURLs)
+	}
+	apiGroups := toString(rule["apiGroups"])
+	if apiGroups != "" {
+		line += fmt.Sprintf(` (%v)`, apiGroups)
+	}
+	return line
+}
+
+func toString(values interface{}) string {
+	if values == nil {
+		return ""
+	}
+	var strs []string
+	for _, v := range values.([]interface{}) {
+		strs = append(strs, v.(string))
+	}
+	return strings.Join(strs, ",")
 }
 
 func (r *Rback) genGraph(p Permissions) *dot.Graph {

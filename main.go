@@ -378,9 +378,9 @@ func (r *Rback) renderLegend(g *dot.Graph) {
 
 	sa := newServiceAccountNode(namespace, "ServiceAccount")
 
-	role := newRoleNode(namespace, "Role")
-	clusterRoleBoundLocally := newClusterRoleNode(namespace, "ClusterRole") // bound by (namespaced!) RoleBinding
-	clusterrole := newClusterRoleNode(legend, "ClusterRole")
+	role := newRoleNode(namespace, "ns", "Role")
+	clusterRoleBoundLocally := newClusterRoleNode(namespace, "ns", "ClusterRole") // bound by (namespaced!) RoleBinding
+	clusterrole := newClusterRoleNode(legend, "", "ClusterRole")
 
 	if r.config.renderBindings {
 		roleBinding := newRoleBindingNode(namespace, "RoleBinding")
@@ -416,9 +416,9 @@ func (r *Rback) renderRole(g *dot.Graph, binding, role NamespacedName, saNode do
 
 	isClusterRole := role.namespace == ""
 	if isClusterRole {
-		roleNode = newClusterRoleNode(g, role.name)
+		roleNode = newClusterRoleNode(g, binding.namespace, role.name)
 	} else {
-		roleNode = newRoleNode(g, role.name)
+		roleNode = newRoleNode(g, binding.namespace, role.name)
 	}
 
 	if r.config.renderBindings {
@@ -483,8 +483,8 @@ func newClusterRoleBindingNode(g *dot.Graph, name string) dot.Node {
 		Attr("fontcolor", "#030303")
 }
 
-func newRoleNode(g *dot.Graph, name string) dot.Node {
-	return g.Node("r-"+name).
+func newRoleNode(g *dot.Graph, namespace, name string) dot.Node {
+	return g.Node("r-"+namespace+"/"+name).
 		Attr("label", name).
 		Attr("shape", "octagon").
 		Attr("style", "filled").
@@ -492,8 +492,8 @@ func newRoleNode(g *dot.Graph, name string) dot.Node {
 		Attr("fontcolor", "#030303")
 }
 
-func newClusterRoleNode(g *dot.Graph, name string) dot.Node {
-	return g.Node("cr-"+name).
+func newClusterRoleNode(g *dot.Graph, namespace, name string) dot.Node {
+	return g.Node("cr-"+namespace+"/"+name).
 		Attr("label", name).
 		Attr("shape", "doubleoctagon").
 		Attr("style", "filled").

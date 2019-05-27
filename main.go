@@ -17,6 +17,7 @@ type Rback struct {
 
 type Config struct {
 	renderRules bool
+	namespace   string
 }
 
 type Permissions struct {
@@ -30,7 +31,8 @@ type Permissions struct {
 func main() {
 
 	config := Config{}
-	flag.BoolVar(&config.renderRules, "render-rules", true, "Whether to render RBAC rules (e.g. \"get pods\" or not")
+	flag.BoolVar(&config.renderRules, "render-rules", true, "Whether to render RBAC rules (e.g. \"get pods\") or not")
+	flag.StringVar(&config.namespace, "n", "", "The namespace to render")
 	flag.Parse()
 
 	rback := Rback{config: config}
@@ -45,9 +47,14 @@ func main() {
 }
 
 // getServiceAccounts retrieves data about service accounts across all namespaces
-func (r *Rback) getServiceAccounts() (serviceAccounts map[string][]string, err error) {
+func (r *Rback) getServiceAccounts(namespace string) (serviceAccounts map[string][]string, err error) {
 	serviceAccounts = make(map[string][]string)
-	res, err := kubecuddler.Kubectl(true, true, "", "get", "sa", "--all-namespaces", "--output", "json")
+	var res string
+	if namespace == "" {
+		res, err = kubecuddler.Kubectl(true, true, "", "get", "sa", "--all-namespaces", "--output", "json")
+	} else {
+		res, err = kubecuddler.Kubectl(true, true, "", "get", "sa", "-n", namespace, "--output", "json")
+	}
 	if err != nil {
 		return serviceAccounts, err
 	}
@@ -173,7 +180,7 @@ func (r *Rback) getClusterRoleBindings() (crolebindings []string, err error) {
 // cluster level.
 func (r *Rback) getPermissions() (Permissions, error) {
 	p := Permissions{}
-	sa, err := r.getServiceAccounts()
+	sa, err := r.getServiceAccounts(r.config.namespace)
 	if err != nil {
 		return p, err
 	}

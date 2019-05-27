@@ -16,9 +16,10 @@ type Rback struct {
 }
 
 type Config struct {
-	renderRules    bool
-	renderBindings bool
-	namespace      string
+	renderRules     bool
+	renderBindings  bool
+	namespace       string
+	ignoredPrefixes []string
 }
 
 type Permissions struct {
@@ -35,7 +36,14 @@ func main() {
 	flag.BoolVar(&config.renderBindings, "render-bindings", true, "Whether to render (Cluster)RoleBindings as graph nodes")
 	flag.BoolVar(&config.renderRules, "render-rules", true, "Whether to render RBAC rules (e.g. \"get pods\") or not")
 	flag.StringVar(&config.namespace, "n", "", "The namespace to render")
+
+	var ignoredPrefixes string
+	flag.StringVar(&ignoredPrefixes, "ignore-prefixes", "system:", "Comma-delimited list of (Cluster)Role(Binding) prefixes to ignore ('none' to not ignore anything)")
 	flag.Parse()
+
+	if ignoredPrefixes != "none" {
+		config.ignoredPrefixes = strings.Split(ignoredPrefixes, ",")
+	}
 
 	rback := Rback{config: config}
 
@@ -46,6 +54,15 @@ func main() {
 	}
 	g := rback.genGraph(p)
 	fmt.Println(g.String())
+}
+
+func (r *Rback) shouldIgnore(name string) bool {
+	for _, prefix := range r.config.ignoredPrefixes {
+		if strings.HasPrefix(name, prefix) {
+			return true
+		}
+	}
+	return false
 }
 
 // getServiceAccounts retrieves data about service accounts across all namespaces
@@ -143,7 +160,7 @@ func (r *Rback) getClusterRoles() (croles []string, err error) {
 		crole := cri.(map[string]interface{})
 		metadata := crole["metadata"].(map[string]interface{})
 		name := metadata["name"]
-		if !strings.HasPrefix(name.(string), "system:") {
+		if !r.shouldIgnore(name.(string)) {
 			crj, _ := struct2json(crole)
 			croles = append(croles, crj)
 		}
@@ -169,7 +186,7 @@ func (r *Rback) getClusterRoleBindings() (crolebindings []string, err error) {
 		crolebinding := cri.(map[string]interface{})
 		metadata := crolebinding["metadata"].(map[string]interface{})
 		name := metadata["name"]
-		if !strings.HasPrefix(name.(string), "system:") {
+		if !r.shouldIgnore(name.(string)) {
 			crbj, _ := struct2json(crolebinding)
 			crolebindings = append(crolebindings, crbj)
 		}

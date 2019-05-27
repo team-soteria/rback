@@ -2,6 +2,7 @@ package main
 
 import (
 	"encoding/json"
+	"flag"
 	"fmt"
 	"os"
 	"strings"
@@ -9,6 +10,14 @@ import (
 	"github.com/emicklei/dot"
 	"github.com/mhausenblas/kubecuddler"
 )
+
+type Rback struct {
+	config Config
+}
+
+type Config struct {
+	renderRules bool
+}
 
 type Permissions struct {
 	ServiceAccounts     map[string][]string
@@ -19,17 +28,24 @@ type Permissions struct {
 }
 
 func main() {
-	p, err := getPermissions()
+
+	config := Config{}
+	flag.BoolVar(&config.renderRules, "render-rules", true, "Whether to render RBAC rules (e.g. \"get pods\" or not")
+	flag.Parse()
+
+	rback := Rback{config: config}
+
+	p, err := rback.getPermissions()
 	if err != nil {
 		fmt.Printf("Can't query permissions due to :%v", err)
 		os.Exit(-1)
 	}
-	g := genGraph(p)
+	g := rback.genGraph(p)
 	fmt.Println(g.String())
 }
 
 // getServiceAccounts retrieves data about service accounts across all namespaces
-func getServiceAccounts() (serviceAccounts map[string][]string, err error) {
+func (r *Rback) getServiceAccounts() (serviceAccounts map[string][]string, err error) {
 	serviceAccounts = make(map[string][]string)
 	res, err := kubecuddler.Kubectl(true, true, "", "get", "sa", "--all-namespaces", "--output", "json")
 	if err != nil {
@@ -53,7 +69,7 @@ func getServiceAccounts() (serviceAccounts map[string][]string, err error) {
 }
 
 // getRoles retrieves data about roles across all namespaces
-func getRoles() (roles map[string][]string, err error) {
+func (r *Rback) getRoles() (roles map[string][]string, err error) {
 	roles = make(map[string][]string)
 	res, err := kubecuddler.Kubectl(true, true, "", "get", "roles", "--all-namespaces", "--output", "json")
 	if err != nil {
@@ -77,7 +93,7 @@ func getRoles() (roles map[string][]string, err error) {
 }
 
 // getRoleBindings retrieves data about roles across all namespaces
-func getRoleBindings() (rolebindings map[string][]string, err error) {
+func (r *Rback) getRoleBindings() (rolebindings map[string][]string, err error) {
 	rolebindings = make(map[string][]string)
 	res, err := kubecuddler.Kubectl(true, true, "", "get", "rolebindings", "--all-namespaces", "--output", "json")
 	if err != nil {
@@ -101,7 +117,7 @@ func getRoleBindings() (rolebindings map[string][]string, err error) {
 }
 
 // getClusterRoles retrieves data about cluster roles
-func getClusterRoles() (croles []string, err error) {
+func (r *Rback) getClusterRoles() (croles []string, err error) {
 	croles = []string{}
 	res, err := kubecuddler.Kubectl(true, true, "", "get", "clusterroles", "--output", "json")
 	if err != nil {
@@ -127,7 +143,7 @@ func getClusterRoles() (croles []string, err error) {
 }
 
 // getClusterRoleBindings retrieves data about cluster role bindings
-func getClusterRoleBindings() (crolebindings []string, err error) {
+func (r *Rback) getClusterRoleBindings() (crolebindings []string, err error) {
 	crolebindings = []string{}
 	res, err := kubecuddler.Kubectl(true, true, "", "get", "clusterrolebindings", "--output", "json")
 	if err != nil {
@@ -155,29 +171,29 @@ func getClusterRoleBindings() (crolebindings []string, err error) {
 // getPermissions retrieves data about all access control related data
 // from service accounts to roles and bindings, both namespaced and the
 // cluster level.
-func getPermissions() (Permissions, error) {
+func (r *Rback) getPermissions() (Permissions, error) {
 	p := Permissions{}
-	sa, err := getServiceAccounts()
+	sa, err := r.getServiceAccounts()
 	if err != nil {
 		return p, err
 	}
 	p.ServiceAccounts = sa
-	roles, err := getRoles()
+	roles, err := r.getRoles()
 	if err != nil {
 		return p, err
 	}
 	p.Roles = roles
-	rb, err := getRoleBindings()
+	rb, err := r.getRoleBindings()
 	if err != nil {
 		return p, err
 	}
 	p.RoleBindings = rb
-	cr, err := getClusterRoles()
+	cr, err := r.getClusterRoles()
 	if err != nil {
 		return p, err
 	}
 	p.ClusterRoles = cr
-	crb, err := getClusterRoleBindings()
+	crb, err := r.getClusterRoleBindings()
 	if err != nil {
 		return p, err
 	}
@@ -186,7 +202,7 @@ func getPermissions() (Permissions, error) {
 }
 
 // lookupRoles lists roles in a namespace for a given service account
-func lookupRoles(namespace, sa string, p Permissions) (roles []string, err error) {
+func (r *Rback) lookupRoles(namespace, sa string, p Permissions) (roles []string, err error) {
 	for _, rb := range p.RoleBindings[namespace] {
 		var d map[string]interface{}
 		b := []byte(rb)
@@ -210,7 +226,7 @@ func lookupRoles(namespace, sa string, p Permissions) (roles []string, err error
 }
 
 // lookupClusterRoles lists cluster roles for a given service account
-func lookupClusterRoles(sa string, p Permissions) (clusterroles []string, err error) {
+func (r *Rback) lookupClusterRoles(sa string, p Permissions) (clusterroles []string, err error) {
 	for _, crb := range p.ClusterRoleBindings {
 		var d map[string]interface{}
 		b := []byte(crb)
@@ -236,7 +252,7 @@ func lookupClusterRoles(sa string, p Permissions) (clusterroles []string, err er
 
 // lookupResources lists resources referenced in a role.
 // if namespace is empty then the scope is cluster-wide.
-func lookupResources(namespace, role string, p Permissions) (resources string, err error) {
+func (r *Rback) lookupResources(namespace, role string, p Permissions) (resources string, err error) {
 	if namespace != "" { // look up in roles
 		for _, roles := range p.Roles[namespace] {
 			var d map[string]interface{}
@@ -279,21 +295,23 @@ func lookupResources(namespace, role string, p Permissions) (resources string, e
 	return resources, nil
 }
 
-func genGraph(p Permissions) *dot.Graph {
+func (r *Rback) genGraph(p Permissions) *dot.Graph {
 	g := dot.NewGraph(dot.Directed)
 	// legend:
 	las := g.Node("SERVICE ACCOUNT").Attr("style", "filled").Attr("fillcolor", "#2f6de1").Attr("fontcolor", "#f0f0f0")
 	lr := g.Node("(CLUSTER) ROLE").Attr("style", "filled").Attr("fillcolor", "#ff9900").Attr("fontcolor", "#030303")
-	lac := g.Node("ACCESS RULES")
 	g.Edge(las, lr)
-	g.Edge(lr, lac)
+	if r.config.renderRules {
+		lac := g.Node("ACCESS RULES")
+		g.Edge(lr, lac)
+	}
 
 	for ns, serviceaccounts := range p.ServiceAccounts {
 		gns := g.Subgraph(ns, dot.ClusterOption{})
 		for _, sa := range serviceaccounts {
 			sanode := gns.Node(sa).Attr("style", "filled").Attr("fillcolor", "#2f6de1").Attr("fontcolor", "#f0f0f0")
 			// cluster roles:
-			croles, err := lookupClusterRoles(sa, p)
+			croles, err := r.lookupClusterRoles(sa, p)
 			if err != nil {
 				fmt.Printf("Can't look up cluster roles due to: %v", err)
 				os.Exit(-2)
@@ -301,18 +319,21 @@ func genGraph(p Permissions) *dot.Graph {
 			for _, crole := range croles {
 				crnode := g.Node(crole).Attr("style", "filled").Attr("fillcolor", "#ff9900").Attr("fontcolor", "#030303")
 				g.Edge(sanode, crnode)
-				res, err := lookupResources("", crole, p)
-				if err != nil {
-					fmt.Printf("Can't look up entities and resources due to: %v", err)
-					os.Exit(-3)
-				}
-				if res != "" {
-					resnode := g.Node(res)
-					g.Edge(crnode, resnode)
+
+				if r.config.renderRules {
+					res, err := r.lookupResources("", crole, p)
+					if err != nil {
+						fmt.Printf("Can't look up entities and resources due to: %v", err)
+						os.Exit(-3)
+					}
+					if res != "" {
+						resnode := g.Node(res)
+						g.Edge(crnode, resnode)
+					}
 				}
 			}
 			// roles:
-			roles, err := lookupRoles(ns, sa, p)
+			roles, err := r.lookupRoles(ns, sa, p)
 			if err != nil {
 				fmt.Printf("Can't look up roles due to: %v", err)
 				os.Exit(-2)
@@ -320,14 +341,17 @@ func genGraph(p Permissions) *dot.Graph {
 			for _, role := range roles {
 				crnode := gns.Node(role).Attr("style", "filled").Attr("fillcolor", "#ff9900").Attr("fontcolor", "#030303")
 				gns.Edge(sanode, crnode)
-				res, err := lookupResources(ns, role, p)
-				if err != nil {
-					fmt.Printf("Can't look up entities and resources due to: %v", err)
-					os.Exit(-3)
-				}
-				if res != "" {
-					resnode := gns.Node(res)
-					gns.Edge(crnode, resnode)
+
+				if r.config.renderRules {
+					res, err := r.lookupResources(ns, role, p)
+					if err != nil {
+						fmt.Printf("Can't look up entities and resources due to: %v", err)
+						os.Exit(-3)
+					}
+					if res != "" {
+						resnode := gns.Node(res)
+						gns.Edge(crnode, resnode)
+					}
 				}
 			}
 

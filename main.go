@@ -20,6 +20,8 @@ type Config struct {
 	renderBindings  bool
 	namespace       string
 	ignoredPrefixes []string
+	resourceKind    string
+	resourceName    string
 }
 
 type Permissions struct {
@@ -41,6 +43,13 @@ func main() {
 	flag.StringVar(&ignoredPrefixes, "ignore-prefixes", "system:", "Comma-delimited list of (Cluster)Role(Binding) prefixes to ignore ('none' to not ignore anything)")
 	flag.Parse()
 
+	if flag.NArg() > 0 {
+		config.resourceKind = normalizeKind(flag.Arg(0))
+	}
+	if flag.NArg() > 1 {
+		config.resourceName = flag.Arg(1)
+	}
+
 	if ignoredPrefixes != "none" {
 		config.ignoredPrefixes = strings.Split(ignoredPrefixes, ",")
 	}
@@ -56,6 +65,20 @@ func main() {
 	fmt.Println(g.String())
 }
 
+var kindMap = map[string]string{
+	"sa":              "serviceaccount",
+	"serviceaccounts": "serviceaccount",
+}
+
+func normalizeKind(kind string) string {
+	kind = strings.ToLower(kind)
+	entry, exists := kindMap[kind]
+	if exists {
+		return entry
+	}
+	return kind
+}
+
 func (r *Rback) shouldIgnore(name string) bool {
 	for _, prefix := range r.config.ignoredPrefixes {
 		if strings.HasPrefix(name, prefix) {
@@ -66,32 +89,46 @@ func (r *Rback) shouldIgnore(name string) bool {
 }
 
 // getServiceAccounts retrieves data about service accounts across all namespaces
-func (r *Rback) getServiceAccounts(namespace string) (serviceAccounts map[string][]string, err error) {
+func (r *Rback) getServiceAccounts(namespace, saName string) (serviceAccounts map[string][]string, err error) {
 	serviceAccounts = make(map[string][]string)
 	var res string
 	if namespace == "" {
 		res, err = kubecuddler.Kubectl(true, true, "", "get", "sa", "--all-namespaces", "--output", "json")
-	} else {
+	} else if saName == "" {
 		res, err = kubecuddler.Kubectl(true, true, "", "get", "sa", "-n", namespace, "--output", "json")
+	} else {
+		res, err = kubecuddler.Kubectl(true, true, "", "get", "sa", "-n", namespace, "--output", "json", saName)
 	}
 	if err != nil {
 		return serviceAccounts, err
 	}
+
 	var d map[string]interface{}
 	b := []byte(res)
 	err = json.Unmarshal(b, &d)
 	if err != nil {
 		return serviceAccounts, err
 	}
-	saitems := d["items"].([]interface{})
-	for _, sa := range saitems {
-		serviceaccount := sa.(map[string]interface{})
-		metadata := serviceaccount["metadata"].(map[string]interface{})
-		ns := metadata["namespace"]
-		name := metadata["name"]
-		serviceAccounts[ns.(string)] = append(serviceAccounts[ns.(string)], name.(string))
+
+	if namespace != "" && saName != "" {
+		namespacedName := getNamespacedName(d)
+		serviceAccounts[namespacedName.namespace] = append(serviceAccounts[namespacedName.namespace], namespacedName.name)
+	} else {
+		saitems := d["items"].([]interface{})
+		for _, sa := range saitems {
+			serviceaccount := sa.(map[string]interface{})
+			namespacedName := getNamespacedName(serviceaccount)
+			serviceAccounts[namespacedName.namespace] = append(serviceAccounts[namespacedName.namespace], namespacedName.name)
+		}
 	}
 	return serviceAccounts, nil
+}
+
+func getNamespacedName(obj map[string]interface{}) NamespacedName {
+	metadata := obj["metadata"].(map[string]interface{})
+	ns := metadata["namespace"]
+	name := metadata["name"]
+	return NamespacedName{ns.(string), name.(string)}
 }
 
 // getRoles retrieves data about roles across all namespaces
@@ -199,7 +236,11 @@ func (r *Rback) getClusterRoleBindings() (crolebindings []string, err error) {
 // cluster level.
 func (r *Rback) getPermissions() (Permissions, error) {
 	p := Permissions{}
-	sa, err := r.getServiceAccounts(r.config.namespace)
+	saName := ""
+	if r.config.resourceKind == "serviceaccount" {
+		saName = r.config.resourceName
+	}
+	sa, err := r.getServiceAccounts(r.config.namespace, saName)
 	if err != nil {
 		return p, err
 	}

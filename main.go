@@ -267,13 +267,13 @@ type KindNamespacedName struct {
 }
 
 // lookupBindings lists bindings & roles for a given service account
-func (r *Rback) lookupBindings(bindings []string, saName, saNamespace string) (roles []Binding, err error) {
+func (r *Rback) lookupBindings(bindings []string, saName, saNamespace string) (results []Binding, err error) {
 	for _, rb := range bindings {
 		var binding map[string]interface{}
 		b := []byte(rb)
 		err = json.Unmarshal(b, &binding)
 		if err != nil {
-			return roles, err
+			return results, err
 		}
 
 		metadata := binding["metadata"].(map[string]interface{})
@@ -319,7 +319,7 @@ func (r *Rback) lookupBindings(bindings []string, saName, saNamespace string) (r
 					})
 				}
 
-				roles = append(roles, Binding{
+				results = append(results, Binding{
 					NamespacedName: NamespacedName{bindingNs, bindingName},
 					role:           NamespacedName{roleNs, roleName},
 					subjects:       subs,
@@ -327,7 +327,7 @@ func (r *Rback) lookupBindings(bindings []string, saName, saNamespace string) (r
 			}
 		}
 	}
-	return roles, nil
+	return results, nil
 }
 
 func stringOrEmpty(i interface{}) string {

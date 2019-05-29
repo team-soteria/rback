@@ -422,7 +422,7 @@ func (r *Rback) genGraph(p Permissions) *dot.Graph {
 		for _, sa := range serviceaccounts {
 			sanode, found := subjectNodes[KindNamespacedName{"ServiceAccount", NamespacedName{ns, sa}}]
 			if !found {
-				sanode = newServiceAccountNode(gns, sa)
+				sanode = newSubjectNode(gns, "ServiceAccount", sa)
 				subjectNodes[KindNamespacedName{"ServiceAccount", NamespacedName{ns, sa}}] = sanode
 			}
 
@@ -453,7 +453,7 @@ func (r *Rback) genGraph(p Permissions) *dot.Graph {
 						gns = r.newNamespaceSubgraph(g, subject.namespace)
 						nsSubgraphs[subject.namespace] = gns
 					}
-					subjectNode = newServiceAccountNode(gns, subject.name)
+					subjectNode = newSubjectNode(gns, subject.kind, subject.name)
 				}
 
 				saNodes = append(saNodes, subjectNode)
@@ -471,7 +471,7 @@ func (r *Rback) renderLegend(g *dot.Graph) {
 	namespace := legend.Subgraph("Namespace", dot.ClusterOption{})
 	namespace.Attr("style", "dashed")
 
-	sa := newServiceAccountNode(namespace, "ServiceAccount")
+	sa := newSubjectNode(namespace, "Kind", "Subject")
 
 	role := newRoleNode(namespace, "ns", "Role")
 	clusterRoleBoundLocally := newClusterRoleNode(namespace, "ns", "ClusterRole") // bound by (namespaced!) RoleBinding
@@ -550,10 +550,10 @@ func (r *Rback) newNamespaceSubgraph(g *dot.Graph, ns string) *dot.Graph {
 	return gns
 }
 
-func newServiceAccountNode(g *dot.Graph, name string) dot.Node {
-	return g.Node("sa-"+name).
+func newSubjectNode(g *dot.Graph, kind, name string) dot.Node {
+	return g.Node(kind+"-"+name).
 		Box().
-		Attr("label", name).
+		Attr("label", fmt.Sprintf("%s\n(%s)", name, kind)).
 		Attr("style", "filled").
 		Attr("fillcolor", "#2f6de1").
 		Attr("fontcolor", "#f0f0f0")

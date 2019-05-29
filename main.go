@@ -17,6 +17,7 @@ type Rback struct {
 
 type Config struct {
 	renderRules     bool
+	showLegend      bool
 	namespaces      []string
 	ignoredPrefixes []string
 	resourceKind    string
@@ -34,6 +35,7 @@ type Permissions struct {
 func main() {
 
 	config := Config{}
+	flag.BoolVar(&config.showLegend, "show-legend", true, "Whether to show the legend or not")
 	flag.BoolVar(&config.renderRules, "render-rules", true, "Whether to render RBAC rules (e.g. \"get pods\") or not")
 
 	var namespaces string
@@ -466,6 +468,10 @@ func (r *Rback) genGraph(p Permissions) *dot.Graph {
 }
 
 func (r *Rback) renderLegend(g *dot.Graph) {
+	if !r.config.showLegend {
+		return
+	}
+
 	legend := g.Subgraph("LEGEND", dot.ClusterOption{})
 
 	namespace := legend.Subgraph("Namespace", dot.ClusterOption{})

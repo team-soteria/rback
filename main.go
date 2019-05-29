@@ -417,18 +417,10 @@ func (r *Rback) genGraph(p Permissions) *dot.Graph {
 	nsSubgraphs[""] = g
 
 	for ns, serviceaccounts := range p.ServiceAccounts {
-		gns := nsSubgraphs[ns]
-		if gns == nil {
-			gns = r.newNamespaceSubgraph(g, ns)
-			nsSubgraphs[ns] = gns
-		}
+		gns := r.existingOrNewNamespaceSubgraph(g, nsSubgraphs, ns)
 
 		for _, sa := range serviceaccounts {
-			sanode, found := subjectNodes[KindNamespacedName{"ServiceAccount", NamespacedName{ns, sa}}]
-			if !found {
-				sanode = newSubjectNode(gns, "ServiceAccount", sa)
-				subjectNodes[KindNamespacedName{"ServiceAccount", NamespacedName{ns, sa}}] = sanode
-			}
+			sanode := r.existingOrNewSubjectNode(gns, subjectNodes, "ServiceAccount", ns, sa)
 
 			// cluster roles:
 			bindings, err := r.lookupBindings(p.ClusterRoleBindings, sa, ns)
@@ -451,16 +443,8 @@ func (r *Rback) genGraph(p Permissions) *dot.Graph {
 			saNodes := []dot.Node{}
 			for _, subject := range binding.subjects {
 				if !r.shouldIgnore(subject.name) {
-					subjectNode, found := subjectNodes[subject]
-					if !found {
-						gns := nsSubgraphs[subject.namespace]
-						if gns == nil {
-							gns = r.newNamespaceSubgraph(g, subject.namespace)
-							nsSubgraphs[subject.namespace] = gns
-						}
-						subjectNode = newSubjectNode(gns, subject.kind, subject.name)
-					}
-
+					gns := r.existingOrNewNamespaceSubgraph(g, nsSubgraphs, subject.namespace)
+					subjectNode := r.existingOrNewSubjectNode(gns, subjectNodes, subject.kind, subject.namespace, subject.name)
 					saNodes = append(saNodes, subjectNode)
 				}
 			}
@@ -469,6 +453,25 @@ func (r *Rback) genGraph(p Permissions) *dot.Graph {
 		}
 	}
 	return g
+}
+
+func (r *Rback) existingOrNewSubjectNode(gns *dot.Graph, subjectNodes map[KindNamespacedName]dot.Node, kind string, ns string, name string) dot.Node {
+	knn := KindNamespacedName{kind, NamespacedName{ns, name}}
+	node, found := subjectNodes[knn]
+	if !found {
+		node = newSubjectNode(gns, kind, name)
+		subjectNodes[knn] = node
+	}
+	return node
+}
+
+func (r *Rback) existingOrNewNamespaceSubgraph(g *dot.Graph, nsSubgraphs map[string]*dot.Graph, ns string) *dot.Graph {
+	gns := nsSubgraphs[ns]
+	if gns == nil {
+		gns = r.newNamespaceSubgraph(g, ns)
+		nsSubgraphs[ns] = gns
+	}
+	return gns
 }
 
 func (r *Rback) renderLegend(g *dot.Graph) {

@@ -416,10 +416,10 @@ func (r *Rback) genGraph(p Permissions) *dot.Graph {
 	nsSubgraphs := map[string]*dot.Graph{}
 	nsSubgraphs[""] = g
 
-	for ns, serviceaccounts := range p.ServiceAccounts {
+	for _, ns := range r.determineNamespacesToShow(p) {
 		gns := r.existingOrNewNamespaceSubgraph(g, nsSubgraphs, ns)
 
-		for _, sa := range serviceaccounts {
+		for _, sa := range p.ServiceAccounts[ns] {
 			sanode := r.existingOrNewSubjectNode(gns, subjectNodes, "ServiceAccount", ns, sa)
 
 			// cluster roles:
@@ -453,6 +453,30 @@ func (r *Rback) genGraph(p Permissions) *dot.Graph {
 		}
 	}
 	return g
+}
+
+func (r *Rback) determineNamespacesToShow(p Permissions) (namespaces []string) {
+	if len(r.config.namespaces) == 1 && r.config.namespaces[0] == "" {
+		type void struct{}
+		var present void
+		namespaceSet := make(map[string]void)
+		for ns, _ := range p.ServiceAccounts {
+			namespaceSet[ns] = present
+		}
+		for ns, _ := range p.RoleBindings {
+			namespaceSet[ns] = present
+		}
+		for ns, _ := range p.Roles {
+			namespaceSet[ns] = present
+		}
+
+		for ns, _ := range namespaceSet {
+			namespaces = append(namespaces, ns)
+		}
+		return namespaces
+	} else {
+		return r.config.namespaces
+	}
 }
 
 func (r *Rback) existingOrNewSubjectNode(gns *dot.Graph, subjectNodes map[KindNamespacedName]dot.Node, kind string, ns string, name string) dot.Node {

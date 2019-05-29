@@ -132,103 +132,72 @@ func getNamespacedName(obj map[string]interface{}) NamespacedName {
 }
 
 // getRoles retrieves data about roles across all namespaces
-func (r *Rback) getRoles() (roles map[string][]string, err error) {
-	roles = make(map[string][]string)
-	res, err := kubecuddler.Kubectl(true, true, "", "get", "roles", "--all-namespaces", "--output", "json")
-	if err != nil {
-		return roles, err
-	}
-	var d map[string]interface{}
-	b := []byte(res)
-	err = json.Unmarshal(b, &d)
-	if err != nil {
-		return roles, err
-	}
-	roleitems := d["items"].([]interface{})
-	for _, ri := range roleitems {
-		role := ri.(map[string]interface{})
-		metadata := role["metadata"].(map[string]interface{})
-		ns := metadata["namespace"]
-		rj, _ := struct2json(role)
-		roles[ns.(string)] = append(roles[ns.(string)], rj)
-	}
-	return roles, nil
+func (r *Rback) getRoles() (result map[string][]string, err error) {
+	return r.getNamespacedResources("roles")
 }
 
 // getRoleBindings retrieves data about roles across all namespaces
-func (r *Rback) getRoleBindings() (rolebindings map[string][]string, err error) {
-	rolebindings = make(map[string][]string)
-	res, err := kubecuddler.Kubectl(true, true, "", "get", "rolebindings", "--all-namespaces", "--output", "json")
+func (r *Rback) getRoleBindings() (result map[string][]string, err error) {
+	return r.getNamespacedResources("rolebindings")
+}
+
+func (r *Rback) getNamespacedResources(kind string) (result map[string][]string, err error) {
+	res, err := kubecuddler.Kubectl(true, true, "", "get", kind, "--all-namespaces", "--output", "json")
+	result = make(map[string][]string)
 	if err != nil {
-		return rolebindings, err
+		return result, err
 	}
 	var d map[string]interface{}
 	b := []byte(res)
 	err = json.Unmarshal(b, &d)
 	if err != nil {
-		return rolebindings, err
+		return result, err
 	}
-	rbitems := d["items"].([]interface{})
-	for _, rbi := range rbitems {
-		rolebinding := rbi.(map[string]interface{})
-		metadata := rolebinding["metadata"].(map[string]interface{})
+	items := d["items"].([]interface{})
+	for _, i := range items {
+		item := i.(map[string]interface{})
+		metadata := item["metadata"].(map[string]interface{})
 		ns := metadata["namespace"]
-		rbj, _ := struct2json(rolebinding)
-		rolebindings[ns.(string)] = append(rolebindings[ns.(string)], rbj)
+		itemJson, _ := struct2json(item)
+		result[ns.(string)] = append(result[ns.(string)], itemJson)
 	}
-	return rolebindings, nil
+	return result, nil
 }
 
 // getClusterRoles retrieves data about cluster roles
-func (r *Rback) getClusterRoles() (croles []string, err error) {
-	croles = []string{}
-	res, err := kubecuddler.Kubectl(true, true, "", "get", "clusterroles", "--output", "json")
-	if err != nil {
-		return croles, err
-	}
-	var d map[string]interface{}
-	b := []byte(res)
-	err = json.Unmarshal(b, &d)
-	if err != nil {
-		return croles, err
-	}
-	croleitems := d["items"].([]interface{})
-	for _, cri := range croleitems {
-		crole := cri.(map[string]interface{})
-		metadata := crole["metadata"].(map[string]interface{})
-		name := metadata["name"]
-		if !r.shouldIgnore(name.(string)) {
-			crj, _ := struct2json(crole)
-			croles = append(croles, crj)
-		}
-	}
-	return croles, nil
+func (r *Rback) getClusterRoles() (result []string, err error) {
+	return r.getClusterScopedResources("clusterroles")
 }
 
 // getClusterRoleBindings retrieves data about cluster role bindings
-func (r *Rback) getClusterRoleBindings() (crolebindings []string, err error) {
-	crolebindings = []string{}
-	res, err := kubecuddler.Kubectl(true, true, "", "get", "clusterrolebindings", "--output", "json")
+func (r *Rback) getClusterRoleBindings() (result []string, err error) {
+	return r.getClusterScopedResources("clusterrolebindings")
+
+}
+
+func (r *Rback) getClusterScopedResources(kind string) (result []string, err error) {
+	result = []string{}
+	res, err := kubecuddler.Kubectl(true, true, "", "get", kind, "--output", "json")
 	if err != nil {
-		return crolebindings, err
+		return result, err
 	}
 	var d map[string]interface{}
 	b := []byte(res)
 	err = json.Unmarshal(b, &d)
 	if err != nil {
-		return crolebindings, err
+		return result, err
 	}
-	crolebindingitems := d["items"].([]interface{})
-	for _, cri := range crolebindingitems {
-		crolebinding := cri.(map[string]interface{})
-		metadata := crolebinding["metadata"].(map[string]interface{})
+	items := d["items"].([]interface{})
+	for _, i := range items {
+		item := i.(map[string]interface{})
+		metadata := item["metadata"].(map[string]interface{})
 		name := metadata["name"]
 		if !r.shouldIgnore(name.(string)) {
-			crbj, _ := struct2json(crolebinding)
-			crolebindings = append(crolebindings, crbj)
+			itemJson, _ := struct2json(item)
+			result = append(result, itemJson)
 		}
 	}
-	return crolebindings, nil
+	return result, nil
 }
 
 // getPermissions retrieves data about all access control related data

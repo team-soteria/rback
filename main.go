@@ -125,7 +125,9 @@ func (r *Rback) getServiceAccounts(namespaces, saNames []string) (serviceAccount
 			for _, sa := range saitems {
 				serviceaccount := sa.(map[string]interface{})
 				namespacedName := getNamespacedName(serviceaccount)
-				serviceAccounts[namespacedName.namespace] = append(serviceAccounts[namespacedName.namespace], namespacedName.name)
+				if !r.shouldIgnore(namespacedName.name) {
+					serviceAccounts[namespacedName.namespace] = append(serviceAccounts[namespacedName.namespace], namespacedName.name)
+				}
 			}
 		}
 	}
@@ -448,17 +450,19 @@ func (r *Rback) genGraph(p Permissions) *dot.Graph {
 		for _, binding := range bindings {
 			saNodes := []dot.Node{}
 			for _, subject := range binding.subjects {
-				subjectNode, found := subjectNodes[subject]
-				if !found {
-					gns := nsSubgraphs[subject.namespace]
-					if gns == nil {
-						gns = r.newNamespaceSubgraph(g, subject.namespace)
-						nsSubgraphs[subject.namespace] = gns
+				if !r.shouldIgnore(subject.name) {
+					subjectNode, found := subjectNodes[subject]
+					if !found {
+						gns := nsSubgraphs[subject.namespace]
+						if gns == nil {
+							gns = r.newNamespaceSubgraph(g, subject.namespace)
+							nsSubgraphs[subject.namespace] = gns
+						}
+						subjectNode = newSubjectNode(gns, subject.kind, subject.name)
 					}
-					subjectNode = newSubjectNode(gns, subject.kind, subject.name)
-				}
 
-				saNodes = append(saNodes, subjectNode)
+					saNodes = append(saNodes, subjectNode)
+				}
 			}
 
 			r.renderRole(gns, binding.NamespacedName, binding.role, saNodes, p)

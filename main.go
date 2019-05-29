@@ -18,7 +18,7 @@ type Rback struct {
 type Config struct {
 	renderRules     bool
 	renderBindings  bool
-	namespace       string
+	namespaces      []string
 	ignoredPrefixes []string
 	resourceKind    string
 	resourceNames   []string
@@ -37,7 +37,9 @@ func main() {
 	config := Config{}
 	flag.BoolVar(&config.renderBindings, "render-bindings", true, "Whether to render (Cluster)RoleBindings as graph nodes")
 	flag.BoolVar(&config.renderRules, "render-rules", true, "Whether to render RBAC rules (e.g. \"get pods\") or not")
-	flag.StringVar(&config.namespace, "n", "", "The namespace to render")
+
+	var namespaces string
+	flag.StringVar(&namespaces, "n", "", "The namespace to render (also supports multiple, comma-delimited namespaces)")
 
 	var ignoredPrefixes string
 	flag.StringVar(&ignoredPrefixes, "ignore-prefixes", "system:", "Comma-delimited list of (Cluster)Role(Binding) prefixes to ignore ('none' to not ignore anything)")
@@ -49,6 +51,8 @@ func main() {
 	if flag.NArg() > 1 {
 		config.resourceNames = flag.Args()[1:]
 	}
+
+	config.namespaces = strings.Split(namespaces, ",")
 
 	if ignoredPrefixes != "none" {
 		config.ignoredPrefixes = strings.Split(ignoredPrefixes, ",")
@@ -89,37 +93,40 @@ func (r *Rback) shouldIgnore(name string) bool {
 }
 
 // getServiceAccounts retrieves data about service accounts across all namespaces
-func (r *Rback) getServiceAccounts(namespace string, saNames []string) (serviceAccounts map[string][]string, err error) {
+func (r *Rback) getServiceAccounts(namespaces, saNames []string) (serviceAccounts map[string][]string, err error) {
 	serviceAccounts = make(map[string][]string)
-	var args []string
-	if namespace == "" {
-		args = []string{"sa", "--all-namespaces", "--output", "json"}
-	} else if len(saNames) == 0 {
-		args = []string{"sa", "-n", namespace, "--output", "json"}
-	} else {
-		args = append([]string{"sa", "-n", namespace, "--output", "json"}, saNames...)
-	}
-	res, err := kubecuddler.Kubectl(true, true, "", "get", args...)
-	if err != nil {
-		return serviceAccounts, err
-	}
 
-	var d map[string]interface{}
-	b := []byte(res)
-	err = json.Unmarshal(b, &d)
-	if err != nil {
-		return serviceAccounts, err
-	}
+	for _, namespace := range namespaces {
+		var args []string
+		if namespace == "" {
+			args = []string{"sa", "--all-namespaces", "--output", "json"}
+		} else if len(saNames) == 0 {
+			args = []string{"sa", "-n", namespace, "--output", "json"}
+		} else {
+			args = append([]string{"sa", "-n", namespace, "--output", "json"}, saNames...)
+		}
+		res, err := kubecuddler.Kubectl(true, true, "", "get", args...)
+		if err != nil {
+			return serviceAccounts, err
+		}
 
-	if d["kind"] != "List" {
-		namespacedName := getNamespacedName(d)
-		serviceAccounts[namespacedName.namespace] = append(serviceAccounts[namespacedName.namespace], namespacedName.name)
-	} else {
-		saitems := d["items"].([]interface{})
-		for _, sa := range saitems {
-			serviceaccount := sa.(map[string]interface{})
-			namespacedName := getNamespacedName(serviceaccount)
+		var d map[string]interface{}
+		b := []byte(res)
+		err = json.Unmarshal(b, &d)
+		if err != nil {
+			return serviceAccounts, err
+		}
+
+		if d["kind"] != "List" {
+			namespacedName := getNamespacedName(d)
 			serviceAccounts[namespacedName.namespace] = append(serviceAccounts[namespacedName.namespace], namespacedName.name)
+		} else {
+			saitems := d["items"].([]interface{})
+			for _, sa := range saitems {
+				serviceaccount := sa.(map[string]interface{})
+				namespacedName := getNamespacedName(serviceaccount)
+				serviceAccounts[namespacedName.namespace] = append(serviceAccounts[namespacedName.namespace], namespacedName.name)
+			}
 		}
 	}
 	return serviceAccounts, nil
@@ -213,7 +220,7 @@ func (r *Rback) getPermissions() (Permissions, error) {
 	if r.config.resourceKind == "serviceaccount" {
 		saNames = r.config.resourceNames
 	}
-	sa, err := r.getServiceAccounts(r.config.namespace, saNames)
+	sa, err := r.getServiceAccounts(r.config.namespaces, saNames)
 	if err != nil {
 		return p, err
 	}

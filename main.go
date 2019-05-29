@@ -248,9 +248,10 @@ func (r *Rback) getPermissions() (Permissions, error) {
 	return p, nil
 }
 
-type BindingAndRole struct {
-	binding NamespacedName
-	role    NamespacedName
+type Binding struct {
+	NamespacedName
+	role     NamespacedName
+	subjects []KindNamespacedName
 }
 
 type NamespacedName struct {
@@ -258,8 +259,13 @@ type NamespacedName struct {
 	name      string
 }
 
-// lookupBindingsAndRoles lists bindings & roles for a given service account
-func (r *Rback) lookupBindingsAndRoles(bindings []string, saName, saNamespace string) (roles []BindingAndRole, err error) {
+type KindNamespacedName struct {
+	kind string
+	NamespacedName
+}
+
+// lookupBindings lists bindings & roles for a given service account
+func (r *Rback) lookupBindings(bindings []string, saName, saNamespace string) (roles []Binding, err error) {
 	for _, rb := range bindings {
 		var binding map[string]interface{}
 		b := []byte(rb)
@@ -284,18 +290,49 @@ func (r *Rback) lookupBindingsAndRoles(bindings []string, saName, saNamespace st
 
 		if binding["subjects"] != nil {
 			subjects := binding["subjects"].([]interface{})
-			for _, subject := range subjects {
-				s := subject.(map[string]interface{})
-				if s["name"] == saName && s["namespace"] == saNamespace {
-					roles = append(roles, BindingAndRole{
-						binding: NamespacedName{bindingNs, bindingName},
-						role:    NamespacedName{roleNs, roleName},
+
+			includeBinding := false
+			if saName == "" {
+				includeBinding = true
+			} else {
+				for _, subject := range subjects {
+					s := subject.(map[string]interface{})
+					if s["name"] == saName && s["namespace"] == saNamespace {
+						includeBinding = true
+						break
+					}
+				}
+			}
+
+			if includeBinding {
+				subs := []KindNamespacedName{}
+				for _, subject := range subjects {
+					s := subject.(map[string]interface{})
+					subs = append(subs, KindNamespacedName{
+						kind: s["kind"].(string),
+						NamespacedName: NamespacedName{
+							namespace: stringOrEmpty(s["namespace"]),
+							name:      s["name"].(string),
+						},
 					})
 				}
+
+				roles = append(roles, Binding{
+					NamespacedName: NamespacedName{bindingNs, bindingName},
+					role:           NamespacedName{roleNs, roleName},
+					subjects:       subs,
+				})
 			}
 		}
 	}
 	return roles, nil
+}
+
+func stringOrEmpty(i interface{}) string {
+	if i == nil {
+		return ""
+	}
+	return i.(string)
 }
 
 // lookupResources lists resources referenced in a role.
@@ -380,24 +417,24 @@ func (r *Rback) genGraph(p Permissions) *dot.Graph {
 		for _, sa := range serviceaccounts {
 			sanode := newServiceAccountNode(gns, sa)
 			// cluster roles:
-			croles, err := r.lookupBindingsAndRoles(p.ClusterRoleBindings, sa, ns)
+			bindings, err := r.lookupBindings(p.ClusterRoleBindings, sa, ns)
 			if err != nil {
 				fmt.Printf("Can't look up cluster roles due to: %v", err)
 				os.Exit(-2)
 			}
-			for _, crole := range croles {
-				r.renderRole(g, crole.binding, crole.role, sanode, p)
+			for _, binding := range bindings {
+				r.renderRole(g, binding.NamespacedName, binding.role, &sanode, p)
 			}
-			// roles:
-			roles, err := r.lookupBindingsAndRoles(p.RoleBindings[ns], sa, ns)
-			if err != nil {
-				fmt.Printf("Can't look up roles due to: %v", err)
-				os.Exit(-2)
-			}
-			for _, role := range roles {
-				r.renderRole(gns, role.binding, role.role, sanode, p)
-			}
+		}
 
+		// roles:
+		bindings, err := r.lookupBindings(p.RoleBindings[ns], "", ns)
+		if err != nil {
+			fmt.Printf("Can't look up roles due to: %v", err)
+			os.Exit(-2)
+		}
+		for _, binding := range bindings {
+			r.renderRole(gns, binding.NamespacedName, binding.role, nil, p)
 		}
 	}
 	return g
@@ -444,7 +481,7 @@ func (r *Rback) renderLegend(g *dot.Graph) {
 	}
 }
 
-func (r *Rback) renderRole(g *dot.Graph, binding, role NamespacedName, saNode dot.Node, p Permissions) {
+func (r *Rback) renderRole(g *dot.Graph, binding, role NamespacedName, saNode *dot.Node, p Permissions) {
 	var roleNode dot.Node
 
 	isClusterRole := role.namespace == ""
@@ -462,9 +499,14 @@ func (r *Rback) renderRole(g *dot.Graph, binding, role NamespacedName, saNode do
 		} else {
 			roleBindingNode = newRoleBindingNode(g, binding.name)
 		}
-		saNode.Edge(roleBindingNode).Edge(roleNode)
+		roleBindingNode.Edge(roleNode)
+		if saNode != nil {
+			saNode.Edge(roleBindingNode).Edge(roleNode)
+		}
 	} else {
-		g.Edge(saNode, roleNode, binding.name)
+		if saNode != nil {
+			saNode.Edge(roleNode, binding.name)
+		}
 	}
 
 	if r.config.renderRules {

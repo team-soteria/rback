@@ -157,9 +157,12 @@ func (r *Rback) getNamespacedResources(kind string) (result map[string][]string,
 	for _, i := range items {
 		item := i.(map[string]interface{})
 		metadata := item["metadata"].(map[string]interface{})
+		name := metadata["name"]
 		ns := metadata["namespace"]
-		itemJson, _ := struct2json(item)
-		result[ns.(string)] = append(result[ns.(string)], itemJson)
+		if !r.shouldIgnore(name.(string)) {
+			itemJson, _ := struct2json(item)
+			result[ns.(string)] = append(result[ns.(string)], itemJson)
+		}
 	}
 	return result, nil
 }

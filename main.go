@@ -560,7 +560,10 @@ func newClusterRoleNode(g *dot.Graph, namespace, name string) dot.Node {
 }
 
 func newRulesNode(g *dot.Graph, namespace, roleName, rules string) dot.Node {
+	rules = strings.ReplaceAll(rules, `\`, `\\`)
+	rules = strings.ReplaceAll(rules, "\n", `\l`) // left-justify text
+	rules = strings.ReplaceAll(rules, `"`, `\"`)  // using Literal, so we need to escape quotes
 	return g.Node("rules-"+namespace+"/"+roleName).
-		Attr("label", rules).
+		Attr("label", dot.Literal(`"`+rules+`"`)).
 		Attr("shape", "note")
 }

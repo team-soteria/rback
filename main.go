@@ -21,7 +21,7 @@ type Config struct {
 	namespace       string
 	ignoredPrefixes []string
 	resourceKind    string
-	resourceName    string
+	resourceNames   []string
 }
 
 type Permissions struct {
@@ -47,7 +47,7 @@ func main() {
 		config.resourceKind = normalizeKind(flag.Arg(0))
 	}
 	if flag.NArg() > 1 {
-		config.resourceName = flag.Arg(1)
+		config.resourceNames = flag.Args()[1:]
 	}
 
 	if ignoredPrefixes != "none" {
@@ -89,16 +89,17 @@ func (r *Rback) shouldIgnore(name string) bool {
 }
 
 // getServiceAccounts retrieves data about service accounts across all namespaces
-func (r *Rback) getServiceAccounts(namespace, saName string) (serviceAccounts map[string][]string, err error) {
+func (r *Rback) getServiceAccounts(namespace string, saNames []string) (serviceAccounts map[string][]string, err error) {
 	serviceAccounts = make(map[string][]string)
-	var res string
+	var args []string
 	if namespace == "" {
-		res, err = kubecuddler.Kubectl(true, true, "", "get", "sa", "--all-namespaces", "--output", "json")
-	} else if saName == "" {
-		res, err = kubecuddler.Kubectl(true, true, "", "get", "sa", "-n", namespace, "--output", "json")
+		args = []string{"sa", "--all-namespaces", "--output", "json"}
+	} else if len(saNames) == 0 {
+		args = []string{"sa", "-n", namespace, "--output", "json"}
 	} else {
-		res, err = kubecuddler.Kubectl(true, true, "", "get", "sa", "-n", namespace, "--output", "json", saName)
+		args = append([]string{"sa", "-n", namespace, "--output", "json"}, saNames...)
 	}
+	res, err := kubecuddler.Kubectl(true, true, "", "get", args...)
 	if err != nil {
 		return serviceAccounts, err
 	}
@@ -110,7 +111,7 @@ func (r *Rback) getServiceAccounts(namespace, saName string) (serviceAccounts ma
 		return serviceAccounts, err
 	}
 
-	if namespace != "" && saName != "" {
+	if d["kind"] != "List" {
 		namespacedName := getNamespacedName(d)
 		serviceAccounts[namespacedName.namespace] = append(serviceAccounts[namespacedName.namespace], namespacedName.name)
 	} else {
@@ -208,11 +209,11 @@ func (r *Rback) getClusterScopedResources(kind string) (result []string, err err
 // cluster level.
 func (r *Rback) getPermissions() (Permissions, error) {
 	p := Permissions{}
-	saName := ""
+	saNames := []string{}
 	if r.config.resourceKind == "serviceaccount" {
-		saName = r.config.resourceName
+		saNames = r.config.resourceNames
 	}
-	sa, err := r.getServiceAccounts(r.config.namespace, saName)
+	sa, err := r.getServiceAccounts(r.config.namespace, saNames)
 	if err != nil {
 		return p, err
 	}

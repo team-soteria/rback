@@ -408,12 +408,24 @@ func (r *Rback) genGraph(p Permissions) *dot.Graph {
 	g.Attr("newrank", "true") // global rank instead of per-subgraph (ensures access rules are always in the same place (at bottom))
 	r.renderLegend(g)
 
+	subjectNodes := map[KindNamespacedName]dot.Node{}
+	nsSubgraphs := map[string]*dot.Graph{}
+	nsSubgraphs[""] = g
+
 	for ns, serviceaccounts := range p.ServiceAccounts {
-		gns := g.Subgraph(ns, dot.ClusterOption{})
-		gns.Attr("style", "dashed")
+		gns := nsSubgraphs[ns]
+		if gns == nil {
+			gns = r.newNamespaceSubgraph(g, ns)
+			nsSubgraphs[ns] = gns
+		}
 
 		for _, sa := range serviceaccounts {
-			sanode := newServiceAccountNode(gns, sa)
+			sanode, found := subjectNodes[KindNamespacedName{"ServiceAccount", NamespacedName{ns, sa}}]
+			if !found {
+				sanode = newServiceAccountNode(gns, sa)
+				subjectNodes[KindNamespacedName{"ServiceAccount", NamespacedName{ns, sa}}] = sanode
+			}
+
 			// cluster roles:
 			bindings, err := r.lookupBindings(p.ClusterRoleBindings, sa, ns)
 			if err != nil {
@@ -421,7 +433,7 @@ func (r *Rback) genGraph(p Permissions) *dot.Graph {
 				os.Exit(-2)
 			}
 			for _, binding := range bindings {
-				r.renderRole(g, binding.NamespacedName, binding.role, &sanode, p)
+				r.renderRole(g, binding.NamespacedName, binding.role, []dot.Node{sanode}, p)
 			}
 		}
 
@@ -432,7 +444,22 @@ func (r *Rback) genGraph(p Permissions) *dot.Graph {
 			os.Exit(-2)
 		}
 		for _, binding := range bindings {
-			r.renderRole(gns, binding.NamespacedName, binding.role, nil, p)
+			saNodes := []dot.Node{}
+			for _, subject := range binding.subjects {
+				subjectNode, found := subjectNodes[subject]
+				if !found {
+					gns := nsSubgraphs[subject.namespace]
+					if gns == nil {
+						gns = r.newNamespaceSubgraph(g, subject.namespace)
+						nsSubgraphs[subject.namespace] = gns
+					}
+					subjectNode = newServiceAccountNode(gns, subject.name)
+				}
+
+				saNodes = append(saNodes, subjectNode)
+			}
+
+			r.renderRole(gns, binding.NamespacedName, binding.role, saNodes, p)
 		}
 	}
 	return g
@@ -473,7 +500,7 @@ func (r *Rback) renderLegend(g *dot.Graph) {
 	}
 }
 
-func (r *Rback) renderRole(g *dot.Graph, binding, role NamespacedName, saNode *dot.Node, p Permissions) {
+func (r *Rback) renderRole(g *dot.Graph, binding, role NamespacedName, saNodes []dot.Node, p Permissions) {
 	var roleNode dot.Node
 
 	isClusterRole := role.namespace == ""
@@ -491,8 +518,8 @@ func (r *Rback) renderRole(g *dot.Graph, binding, role NamespacedName, saNode *d
 		roleBindingNode = newRoleBindingNode(g, binding.name)
 	}
 	roleBindingNode.Edge(roleNode)
-	if saNode != nil {
-		saNode.Edge(roleBindingNode).Edge(roleNode)
+	for _, saNode := range saNodes {
+		saNode.Edge(roleBindingNode)
 	}
 
 	if r.config.renderRules {
@@ -515,6 +542,12 @@ func struct2json(s map[string]interface{}) (string, error) {
 		return "", err
 	}
 	return string(str), nil
+}
+
+func (r *Rback) newNamespaceSubgraph(g *dot.Graph, ns string) *dot.Graph {
+	gns := g.Subgraph(ns, dot.ClusterOption{})
+	gns.Attr("style", "dashed")
+	return gns
 }
 
 func newServiceAccountNode(g *dot.Graph, name string) dot.Node {

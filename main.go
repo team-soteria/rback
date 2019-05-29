@@ -292,38 +292,33 @@ func (r *Rback) lookupBindingsAndRoles(bindings []string, sa string) (roles []Bi
 
 // lookupResources lists resources referenced in a role.
 // if namespace is empty then the scope is cluster-wide.
-func (r *Rback) lookupResources(namespace, role string, p Permissions) (resources string, err error) {
+func (r *Rback) lookupResources(namespace, role string, p Permissions) (rules string, err error) {
 	if namespace != "" { // look up in roles
-		for _, roles := range p.Roles[namespace] {
-			var d map[string]interface{}
-			b := []byte(roles)
-			err = json.Unmarshal(b, &d)
-			if err != nil {
-				return "", err
-			}
-			metadata := d["metadata"].(map[string]interface{})
-			rname := metadata["name"]
-			if rname == role {
-				rules := d["rules"].([]interface{})
-				for _, rule := range rules {
-					r := rule.(map[string]interface{})
-					resources += toHumanReadableRule(r) + "\n"
-				}
-			}
-		}
-	}
-	// ... otherwise, look up in cluster roles:
-	for _, cr := range p.ClusterRoles {
-		var d map[string]interface{}
-		b := []byte(cr)
-		err = json.Unmarshal(b, &d)
+		rules, err = findAccessRules(p.Roles[namespace], role)
 		if err != nil {
 			return "", err
 		}
-		metadata := d["metadata"].(map[string]interface{})
-		crname := metadata["name"]
-		if crname == role {
-			rules := d["rules"].([]interface{})
+	}
+	// ... otherwise, look up in cluster roles:
+	clusterRules, err := findAccessRules(p.ClusterRoles, role)
+	if err != nil {
+		return "", err
+	}
+	return clusterRules + rules, nil
+}
+
+func findAccessRules(roles []string, roleName string) (resources string, err error) {
+	for _, roleJson := range roles {
+		var role map[string]interface{}
+		b := []byte(roleJson)
+		err = json.Unmarshal(b, &role)
+		if err != nil {
+			return "", err
+		}
+		metadata := role["metadata"].(map[string]interface{})
+		name := metadata["name"]
+		if name == roleName {
+			rules := role["rules"].([]interface{})
 			for _, rule := range rules {
 				r := rule.(map[string]interface{})
 				resources += toHumanReadableRule(r) + "\n"

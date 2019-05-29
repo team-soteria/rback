@@ -251,7 +251,7 @@ type NamespacedName struct {
 }
 
 // lookupBindingsAndRoles lists bindings & roles for a given service account
-func (r *Rback) lookupBindingsAndRoles(bindings []string, sa string) (roles []BindingAndRole, err error) {
+func (r *Rback) lookupBindingsAndRoles(bindings []string, saName, saNamespace string) (roles []BindingAndRole, err error) {
 	for _, rb := range bindings {
 		var binding map[string]interface{}
 		b := []byte(rb)
@@ -278,7 +278,7 @@ func (r *Rback) lookupBindingsAndRoles(bindings []string, sa string) (roles []Bi
 			subjects := binding["subjects"].([]interface{})
 			for _, subject := range subjects {
 				s := subject.(map[string]interface{})
-				if s["name"] == sa {
+				if s["name"] == saName && s["namespace"] == saNamespace {
 					roles = append(roles, BindingAndRole{
 						binding: NamespacedName{bindingNs, bindingName},
 						role:    NamespacedName{roleNs, roleName},
@@ -372,7 +372,7 @@ func (r *Rback) genGraph(p Permissions) *dot.Graph {
 		for _, sa := range serviceaccounts {
 			sanode := newServiceAccountNode(gns, sa)
 			// cluster roles:
-			croles, err := r.lookupBindingsAndRoles(p.ClusterRoleBindings, sa)
+			croles, err := r.lookupBindingsAndRoles(p.ClusterRoleBindings, sa, ns)
 			if err != nil {
 				fmt.Printf("Can't look up cluster roles due to: %v", err)
 				os.Exit(-2)
@@ -381,7 +381,7 @@ func (r *Rback) genGraph(p Permissions) *dot.Graph {
 				r.renderRole(g, crole.binding, crole.role, sanode, p)
 			}
 			// roles:
-			roles, err := r.lookupBindingsAndRoles(p.RoleBindings[ns], sa)
+			roles, err := r.lookupBindingsAndRoles(p.RoleBindings[ns], sa, ns)
 			if err != nil {
 				fmt.Printf("Can't look up roles due to: %v", err)
 				os.Exit(-2)

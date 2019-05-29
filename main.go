@@ -478,14 +478,17 @@ func (r *Rback) renderLegend(g *dot.Graph) {
 	clusterrole := newClusterRoleNode(legend, "", "ClusterRole")
 
 	roleBinding := newRoleBindingNode(namespace, "RoleBinding")
-	sa.Edge(roleBinding).Edge(role)
+	sa.Edge(roleBinding).Attr("dir", "back")
+	roleBinding.Edge(role)
 
 	roleBinding2 := newRoleBindingNode(namespace, "RoleBinding-to-ClusterRole")
 	roleBinding2.Attr("label", "RoleBinding")
-	sa.Edge(roleBinding2).Edge(clusterRoleBoundLocally)
+	sa.Edge(roleBinding2).Attr("dir", "back")
+	roleBinding2.Edge(clusterRoleBoundLocally)
 
 	clusterRoleBinding := newClusterRoleBindingNode(legend, "ClusterRoleBinding")
-	sa.Edge(clusterRoleBinding).Edge(clusterrole)
+	sa.Edge(clusterRoleBinding).Attr("dir", "back")
+	clusterRoleBinding.Edge(clusterrole)
 
 	if r.config.renderRules {
 		nsrules := newRulesNode(namespace, "ns", "Role", "Namespace-scoped\naccess rules")
@@ -519,7 +522,7 @@ func (r *Rback) renderRole(g *dot.Graph, binding, role NamespacedName, saNodes [
 	}
 	roleBindingNode.Edge(roleNode)
 	for _, saNode := range saNodes {
-		saNode.Edge(roleBindingNode)
+		saNode.Edge(roleBindingNode).Attr("dir", "back")
 	}
 
 	if r.config.renderRules {

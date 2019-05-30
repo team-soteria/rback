@@ -106,8 +106,8 @@ func item2Name(name, namespace string, item map[string]interface{}) string {
 }
 
 // getServiceAccounts retrieves data about service accounts across all namespaces
-func (r *Rback) getServiceAccounts(namespaces, names []string) (result map[string]map[string]string, err error) {
-	return r.getNamespacedResources("sa", namespaces, names, item2Name)
+func (r *Rback) getServiceAccounts() (result map[string]map[string]string, err error) {
+	return r.getNamespacedResources("sa", []string{""}, []string{}, item2Name)
 }
 
 func getNamespacedName(obj map[string]interface{}) NamespacedName {
@@ -128,8 +128,8 @@ func (r *Rback) getRoles() (result map[string]map[string]string, err error) {
 }
 
 // getRoleBindings retrieves data about roles across all namespaces
-func (r *Rback) getRoleBindings(namespaces, names []string) (result map[string]map[string]string, err error) {
-	return r.getNamespacedResources("rolebindings", namespaces, names, item2json)
+func (r *Rback) getRoleBindings() (result map[string]map[string]string, err error) {
+	return r.getNamespacedResources("rolebindings", []string{""}, []string{}, item2json)
 }
 
 func (r *Rback) getNamespacedResources(kind string, namespaces, names []string, mapFunc func(name, namespace string, item map[string]interface{}) string) (result map[string]map[string]string, err error) {
@@ -221,11 +221,7 @@ func (r *Rback) getClusterScopedResources(kind string) (result map[string]string
 // from service accounts to roles and bindings, both namespaced and the
 // cluster level.
 func (r *Rback) fetchPermissions() error {
-	saNames := []string{}
-	if r.config.resourceKind == "serviceaccount" {
-		saNames = r.config.resourceNames
-	}
-	sa, err := r.getServiceAccounts(r.config.namespaces, saNames)
+	sa, err := r.getServiceAccounts()
 	if err != nil {
 		return err
 	}
@@ -237,7 +233,7 @@ func (r *Rback) fetchPermissions() error {
 	}
 	r.permissions.Roles = roles
 
-	rb, err := r.getRoleBindings([]string{""}, []string{})
+	rb, err := r.getRoleBindings()
 	if err != nil {
 		return err
 	}
@@ -428,7 +424,13 @@ func (r *Rback) genGraph() *dot.Graph {
 			gns := r.existingOrNewNamespaceSubgraph(g, nsSubgraphs, ns)
 
 			for _, sa := range r.permissions.ServiceAccounts[ns] {
-				r.existingOrNewSubjectNode(gns, subjectNodes, "ServiceAccount", ns, sa)
+				renderSA := true
+				if r.config.resourceKind == "serviceaccount" {
+					renderSA = (allNamespaces || contains(r.config.namespaces, ns)) && (allResourceNames || contains(r.config.resourceNames, sa))
+				}
+				if renderSA {
+					r.existingOrNewSubjectNode(gns, subjectNodes, "ServiceAccount", ns, sa)
+				}
 			}
 		}
 	}

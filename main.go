@@ -94,46 +94,13 @@ func (r *Rback) shouldIgnore(name string) bool {
 	return false
 }
 
+func item2Name(name, namespace string, item map[string]interface{}) string {
+	return name
+}
+
 // getServiceAccounts retrieves data about service accounts across all namespaces
-func (r *Rback) getServiceAccounts(namespaces, saNames []string) (serviceAccounts map[string][]string, err error) {
-	serviceAccounts = make(map[string][]string)
-
-	for _, namespace := range namespaces {
-		var args []string
-		if namespace == "" {
-			args = []string{"sa", "--all-namespaces", "--output", "json"}
-		} else if len(saNames) == 0 {
-			args = []string{"sa", "-n", namespace, "--output", "json"}
-		} else {
-			args = append([]string{"sa", "-n", namespace, "--output", "json"}, saNames...)
-		}
-		res, err := kubecuddler.Kubectl(true, true, "", "get", args...)
-		if err != nil {
-			return serviceAccounts, err
-		}
-
-		var d map[string]interface{}
-		b := []byte(res)
-		err = json.Unmarshal(b, &d)
-		if err != nil {
-			return serviceAccounts, err
-		}
-
-		if d["kind"] != "List" {
-			namespacedName := getNamespacedName(d)
-			serviceAccounts[namespacedName.namespace] = append(serviceAccounts[namespacedName.namespace], namespacedName.name)
-		} else {
-			saitems := d["items"].([]interface{})
-			for _, sa := range saitems {
-				serviceaccount := sa.(map[string]interface{})
-				namespacedName := getNamespacedName(serviceaccount)
-				if !r.shouldIgnore(namespacedName.name) {
-					serviceAccounts[namespacedName.namespace] = append(serviceAccounts[namespacedName.namespace], namespacedName.name)
-				}
-			}
-		}
-	}
-	return serviceAccounts, nil
+func (r *Rback) getServiceAccounts(namespaces, names []string) (result map[string][]string, err error) {
+	return r.getNamespacedResources("sa", namespaces, names, item2Name)
 }
 
 func getNamespacedName(obj map[string]interface{}) NamespacedName {
@@ -143,17 +110,22 @@ func getNamespacedName(obj map[string]interface{}) NamespacedName {
 	return NamespacedName{ns.(string), name.(string)}
 }
 
+func item2json(name, namespace string, item map[string]interface{}) string {
+	itemJson, _ := struct2json(item)
+	return itemJson
+}
+
 // getRoles retrieves data about roles across all namespaces
 func (r *Rback) getRoles() (result map[string][]string, err error) {
-	return r.getNamespacedResources("roles", []string{""}, []string{})
+	return r.getNamespacedResources("roles", []string{""}, []string{}, item2json)
 }
 
 // getRoleBindings retrieves data about roles across all namespaces
 func (r *Rback) getRoleBindings(namespaces, names []string) (result map[string][]string, err error) {
-	return r.getNamespacedResources("rolebindings", namespaces, names)
+	return r.getNamespacedResources("rolebindings", namespaces, names, item2json)
 }
 
-func (r *Rback) getNamespacedResources(kind string, namespaces, names []string) (result map[string][]string, err error) {
+func (r *Rback) getNamespacedResources(kind string, namespaces, names []string, mapFunc func(name, namespace string, item map[string]interface{}) string) (result map[string][]string, err error) {
 	result = make(map[string][]string)
 	for _, namespace := range namespaces {
 		var args []string
@@ -179,18 +151,14 @@ func (r *Rback) getNamespacedResources(kind string, namespaces, names []string) 
 			items := d["items"].([]interface{})
 			for _, i := range items {
 				item := i.(map[string]interface{})
-				metadata := item["metadata"].(map[string]interface{})
-				name := metadata["name"]
-				ns := metadata["namespace"]
-				if !r.shouldIgnore(name.(string)) {
-					itemJson, _ := struct2json(item)
-					result[ns.(string)] = append(result[ns.(string)], itemJson)
+				nn := getNamespacedName(item)
+				if !r.shouldIgnore(nn.name) {
+					result[nn.namespace] = append(result[nn.namespace], mapFunc(nn.name, nn.namespace, item))
 				}
 			}
 		} else {
-			namespacedName := getNamespacedName(d)
-			itemJson, _ := struct2json(d)
-			result[namespacedName.namespace] = append(result[namespacedName.namespace], itemJson)
+			nn := getNamespacedName(d)
+			result[nn.namespace] = append(result[nn.namespace], mapFunc(nn.name, nn.namespace, d))
 		}
 	}
 	return result, nil

@@ -541,7 +541,7 @@ func (r *Rback) existingOrNewSubjectNode(gns *dot.Graph, subjectNodes map[KindNa
 	knn := KindNamespacedName{kind, NamespacedName{ns, name}}
 	node, found := subjectNodes[knn]
 	if !found {
-		node = r.newSubjectNode(gns, kind, name, r.isFocused(strings.ToLower(kind), ns, name))
+		node = r.newSubjectNode(gns, kind, name, r.subjectExists(kind, ns, name), r.isFocused(strings.ToLower(kind), ns, name))
 		subjectNodes[knn] = node
 	}
 	return node
@@ -566,14 +566,16 @@ func (r *Rback) renderLegend(g *dot.Graph) {
 	namespace := legend.Subgraph("Namespace", dot.ClusterOption{})
 	namespace.Attr("style", "dashed")
 
-	sa := r.newSubjectNode(namespace, "Kind", "Subject", false)
+	sa := r.newSubjectNode(namespace, "Kind", "Subject", true, false)
+	missingSa := r.newSubjectNode(namespace, "Kind", "Missing Subject", false, false)
 
-	role := r.newRoleNode(namespace, "ns", "Role", false)
-	clusterRoleBoundLocally := r.newClusterRoleNode(namespace, "ns", "ClusterRole", false) // bound by (namespaced!) RoleBinding
-	clusterrole := r.newClusterRoleNode(legend, "", "ClusterRole", false)
+	role := r.newRoleNode(namespace, "ns", "Role", true, false)
+	clusterRoleBoundLocally := r.newClusterRoleNode(namespace, "ns", "ClusterRole", true, false) // bound by (namespaced!) RoleBinding
+	clusterrole := r.newClusterRoleNode(legend, "", "ClusterRole", true, false)
 
 	roleBinding := r.newRoleBindingNode(namespace, "RoleBinding", false)
 	sa.Edge(roleBinding).Attr("dir", "back")
+	missingSa.Edge(roleBinding).Attr("dir", "back")
 	roleBinding.Edge(role)
 
 	roleBinding2 := r.newRoleBindingNode(namespace, "RoleBinding-to-ClusterRole", false)
@@ -603,9 +605,9 @@ func (r *Rback) renderBindingAndRole(g *dot.Graph, binding, role NamespacedName)
 
 	isClusterRole := role.namespace == ""
 	if isClusterRole {
-		roleNode = r.newClusterRoleNode(g, binding.namespace, role.name, r.isFocused("clusterrole", role.namespace, role.name))
+		roleNode = r.newClusterRoleNode(g, binding.namespace, role.name, r.clusterRoleExists(role), r.isFocused("clusterrole", role.namespace, role.name))
 	} else {
-		roleNode = r.newRoleNode(g, binding.namespace, role.name, r.isFocused("role", role.namespace, role.name))
+		roleNode = r.newRoleNode(g, binding.namespace, role.name, r.roleExists(role), r.isFocused("role", role.namespace, role.name))
 	}
 
 	var roleBindingNode dot.Node
@@ -647,14 +649,15 @@ func (r *Rback) newNamespaceSubgraph(g *dot.Graph, ns string) *dot.Graph {
 	return gns
 }
 
-func (r *Rback) newSubjectNode(g *dot.Graph, kind, name string, highlight bool) dot.Node {
+func (r *Rback) newSubjectNode(g *dot.Graph, kind, name string, exists, highlight bool) dot.Node {
 	return g.Node(kind+"-"+name).
 		Box().
 		Attr("label", fmt.Sprintf("%s\n(%s)", name, kind)).
-		Attr("style", "filled").
-		Attr("penwidth", iff(highlight, "2.0", "1.0")).
+		Attr("style", iff(exists, "filled", "dotted")).
+		Attr("color", iff(exists, "black", "red")).
+		Attr("penwidth", iff(highlight || !exists, "2.0", "1.0")).
 		Attr("fillcolor", "#2f6de1").
-		Attr("fontcolor", "#f0f0f0")
+		Attr("fontcolor", iff(exists, "#f0f0f0", "#030303"))
 }
 
 func (r *Rback) newRoleBindingNode(g *dot.Graph, name string, highlight bool) dot.Node {
@@ -677,22 +680,24 @@ func (r *Rback) newClusterRoleBindingNode(g *dot.Graph, name string, highlight b
 		Attr("fontcolor", "#030303")
 }
 
-func (r *Rback) newRoleNode(g *dot.Graph, namespace, name string, highlight bool) dot.Node {
+func (r *Rback) newRoleNode(g *dot.Graph, namespace, name string, exists, highlight bool) dot.Node {
 	return g.Node("r-"+namespace+"/"+name).
 		Attr("label", name).
 		Attr("shape", "octagon").
-		Attr("style", "filled").
-		Attr("penwidth", iff(highlight, "2.0", "1.0")).
+		Attr("style", iff(exists, "filled", "dotted")).
+		Attr("color", iff(exists, "black", "red")).
+		Attr("penwidth", iff(highlight || !exists, "2.0", "1.0")).
 		Attr("fillcolor", "#ff9900").
 		Attr("fontcolor", "#030303")
 }
 
-func (r *Rback) newClusterRoleNode(g *dot.Graph, namespace, name string, highlight bool) dot.Node {
+func (r *Rback) newClusterRoleNode(g *dot.Graph, namespace, name string, exists, highlight bool) dot.Node {
 	return g.Node("cr-"+namespace+"/"+name).
 		Attr("label", name).
 		Attr("shape", "doubleoctagon").
-		Attr("style", iff(namespace == "", "filled", "filled,dashed")).
-		Attr("penwidth", iff(highlight, "2.0", "1.0")).
+		Attr("style", iff(exists, iff(namespace == "", "filled", "filled,dashed"), "dotted")).
+		Attr("color", iff(exists, "black", "red")).
+		Attr("penwidth", iff(highlight || !exists, "2.0", "1.0")).
 		Attr("fillcolor", "#ff9900").
 		Attr("fontcolor", "#030303")
 }
@@ -702,6 +707,37 @@ func (r *Rback) isFocused(kind string, ns string, name string) bool {
 	return r.config.resourceKind == kind &&
 		(allNamespaces || contains(r.config.namespaces, ns)) &&
 		contains(r.config.resourceNames, name)
+}
+
+func (r *Rback) subjectExists(kind string, ns string, name string) bool {
+	if strings.ToLower(kind) != "serviceaccount" {
+		return true // assume users and groups exist
+	}
+
+	if list, ok := r.permissions.ServiceAccounts[ns]; ok {
+		for _, sa := range list {
+			if sa == name {
+				return true
+			}
+		}
+	}
+	return false
+}
+
+func (r *Rback) roleExists(role NamespacedName) bool {
+	if roles, nsExists := r.permissions.Roles[role.namespace]; nsExists {
+		if _, roleExists := roles[role.name]; roleExists {
+			return true
+		}
+	}
+	return false
+}
+
+func (r *Rback) clusterRoleExists(role NamespacedName) bool {
+	if _, roleExists := r.permissions.ClusterRoles[role.name]; roleExists {
+		return true
+	}
+	return false
 }
 
 func newRulesNode(g *dot.Graph, namespace, roleName, rules string) dot.Node {

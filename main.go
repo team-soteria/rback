@@ -466,7 +466,37 @@ func (r *Rback) genGraph() *dot.Graph {
 			}
 
 			gns := r.existingOrNewNamespaceSubgraph(g, nsSubgraphs, binding.namespace)
-			bindingNode := r.renderBindingAndRole(gns, binding.NamespacedName, binding.role)
+
+			var bindingNode dot.Node
+			isClusterRoleBinding := binding.namespace == ""
+			if isClusterRoleBinding {
+				bindingNode = r.newClusterRoleBindingNode(gns, binding.name, r.isFocused("clusterrolebinding", "", binding.name))
+			} else {
+				bindingNode = r.newRoleBindingNode(gns, binding.name, r.isFocused("rolebinding", binding.namespace, binding.name))
+			}
+
+			role := binding.role
+			var roleNode dot.Node
+			isClusterRole := role.namespace == ""
+			if isClusterRole {
+				roleNode = r.newClusterRoleNode(gns, binding.namespace, role.name, r.clusterRoleExists(role), r.isFocused("clusterrole", role.namespace, role.name))
+			} else {
+				roleNode = r.newRoleNode(gns, binding.namespace, role.name, r.roleExists(role), r.isFocused("role", role.namespace, role.name))
+			}
+
+			bindingNode.Edge(roleNode)
+
+			if r.config.showRules {
+				rules, err := r.lookupResources(binding.namespace, role.name)
+				if err != nil {
+					fmt.Printf("Can't look up entities and resources due to: %v", err)
+					os.Exit(-3)
+				}
+				if rules != "" {
+					rulesNode := newRulesNode(gns, binding.namespace, role.name, rules)
+					gns.Edge(roleNode, rulesNode)
+				}
+			}
 
 			saNodes := []dot.Node{}
 			for _, subject := range binding.subjects {
@@ -586,40 +616,6 @@ func (r *Rback) renderLegend(g *dot.Graph) {
 		clusterrules := newRulesNode(legend, "", "ClusterRole", "Cluster-scoped\naccess rules")
 		legend.Edge(clusterrole, clusterrules)
 	}
-}
-
-func (r *Rback) renderBindingAndRole(g *dot.Graph, binding, role NamespacedName) dot.Node {
-	var roleNode dot.Node
-
-	isClusterRole := role.namespace == ""
-	if isClusterRole {
-		roleNode = r.newClusterRoleNode(g, binding.namespace, role.name, r.clusterRoleExists(role), r.isFocused("clusterrole", role.namespace, role.name))
-	} else {
-		roleNode = r.newRoleNode(g, binding.namespace, role.name, r.roleExists(role), r.isFocused("role", role.namespace, role.name))
-	}
-
-	var roleBindingNode dot.Node
-	isClusterRoleBinding := binding.namespace == ""
-	if isClusterRoleBinding {
-		roleBindingNode = r.newClusterRoleBindingNode(g, binding.name, r.isFocused("clusterrolebinding", "", binding.name))
-	} else {
-		roleBindingNode = r.newRoleBindingNode(g, binding.name, r.isFocused("rolebinding", binding.namespace, binding.name))
-	}
-	roleBindingNode.Edge(roleNode)
-
-	if r.config.showRules {
-		rules, err := r.lookupResources(binding.namespace, role.name)
-		if err != nil {
-			fmt.Printf("Can't look up entities and resources due to: %v", err)
-			os.Exit(-3)
-		}
-		if rules != "" {
-			resnode := newRulesNode(g, binding.namespace, role.name, rules)
-			g.Edge(roleNode, resnode)
-		}
-	}
-
-	return roleBindingNode
 }
 
 // struct2json turns a map into a JSON string

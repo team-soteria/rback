@@ -70,10 +70,12 @@ func main() {
 }
 
 var kindMap = map[string]string{
-	"sa":              "serviceaccount",
-	"serviceaccounts": "serviceaccount",
-	"rb":              "rolebinding",
-	"rolebindings":    "rolebinding",
+	"sa":                  "serviceaccount",
+	"serviceaccounts":     "serviceaccount",
+	"rb":                  "rolebinding",
+	"rolebindings":        "rolebinding",
+	"crb":                 "clusterrolebinding",
+	"clusterrolebindings": "clusterrolebinding",
 }
 
 func normalizeKind(kind string) string {
@@ -415,23 +417,20 @@ func (r *Rback) genGraph(p Permissions) *dot.Graph {
 			gns := r.existingOrNewNamespaceSubgraph(g, nsSubgraphs, ns)
 
 			for _, sa := range p.ServiceAccounts[ns] {
-				sanode := r.existingOrNewSubjectNode(gns, subjectNodes, "ServiceAccount", ns, sa)
-
-				// cluster roles:
-				bindings, err := r.lookupBindings(p.ClusterRoleBindings, sa, ns)
-				if err != nil {
-					fmt.Printf("Can't look up cluster roles due to: %v", err)
-					os.Exit(-2)
-				}
-				for _, binding := range bindings {
-					bindingNode := r.renderBindingAndRole(g, binding.NamespacedName, binding.role, p)
-					sanode.Edge(bindingNode).Attr("dir", "back")
-				}
+				r.existingOrNewSubjectNode(gns, subjectNodes, "ServiceAccount", ns, sa)
 			}
 		}
 	}
-	// roles:
+
+	allBindings := [][]string{
+		p.ClusterRoleBindings,
+	}
 	for _, roleBindings := range p.RoleBindings {
+		allBindings = append(allBindings, roleBindings)
+	}
+
+	// roles:
+	for _, roleBindings := range allBindings {
 		bindings, err := r.lookupBindings(roleBindings, "", "")
 		if err != nil {
 			fmt.Printf("Can't look up roles due to: %v", err)
@@ -443,6 +442,8 @@ func (r *Rback) genGraph(p Permissions) *dot.Graph {
 				renderBinding = allNamespaces || contains(r.config.namespaces, binding.namespace)
 			} else if r.config.resourceKind == "rolebinding" {
 				renderBinding = (allNamespaces || contains(r.config.namespaces, binding.namespace)) && (allResourceNames || contains(r.config.resourceNames, binding.name))
+			} else if r.config.resourceKind == "clusterrolebinding" {
+				renderBinding = binding.namespace == "" && (allResourceNames || contains(r.config.resourceNames, binding.name))
 			} else if r.config.resourceKind == "serviceaccount" {
 				for _, subject := range binding.subjects {
 					if subject.kind == "ServiceAccount" && (allNamespaces || contains(r.config.namespaces, subject.namespace)) && (allResourceNames || contains(r.config.resourceNames, subject.name)) {
@@ -466,6 +467,8 @@ func (r *Rback) genGraph(p Permissions) *dot.Graph {
 					if r.config.resourceKind == "" {
 						renderSubject = true
 					} else if r.config.resourceKind == "rolebinding" {
+						renderSubject = true
+					} else if r.config.resourceKind == "clusterrolebinding" {
 						renderSubject = true
 					} else if r.config.resourceKind == "serviceaccount" {
 						renderSubject = (allNamespaces || contains(r.config.namespaces, subject.namespace)) && (allResourceNames || contains(r.config.resourceNames, subject.name))

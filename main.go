@@ -429,59 +429,58 @@ func (r *Rback) genGraph(p Permissions) *dot.Graph {
 				}
 			}
 		}
-
-		// roles:
-		for _, roleBindings := range p.RoleBindings {
-			bindings, err := r.lookupBindings(roleBindings, "", ns)
-			if err != nil {
-				fmt.Printf("Can't look up roles due to: %v", err)
-				os.Exit(-2)
-			}
-			for _, binding := range bindings {
-				renderBinding := false
-				if r.config.resourceKind == "" {
-					renderBinding = allNamespaces || contains(r.config.namespaces, binding.namespace)
-				} else if r.config.resourceKind == "rolebinding" {
-					renderBinding = (allNamespaces || contains(r.config.namespaces, binding.namespace)) && (allResourceNames || contains(r.config.resourceNames, binding.name))
-				} else if r.config.resourceKind == "serviceaccount" {
-					for _, subject := range binding.subjects {
-						if subject.kind == "ServiceAccount" && (allNamespaces || contains(r.config.namespaces, subject.namespace)) && (allResourceNames || contains(r.config.resourceNames, subject.name)) {
-							renderBinding = true
-							break
-						}
-					}
-				}
-
-				if !renderBinding {
-					continue
-				}
-
-				gns := r.existingOrNewNamespaceSubgraph(g, nsSubgraphs, binding.namespace)
-				bindingNode := r.renderBindingAndRole(gns, binding.NamespacedName, binding.role, p)
-
-				saNodes := []dot.Node{}
+	}
+	// roles:
+	for _, roleBindings := range p.RoleBindings {
+		bindings, err := r.lookupBindings(roleBindings, "", "")
+		if err != nil {
+			fmt.Printf("Can't look up roles due to: %v", err)
+			os.Exit(-2)
+		}
+		for _, binding := range bindings {
+			renderBinding := false
+			if r.config.resourceKind == "" {
+				renderBinding = allNamespaces || contains(r.config.namespaces, binding.namespace)
+			} else if r.config.resourceKind == "rolebinding" {
+				renderBinding = (allNamespaces || contains(r.config.namespaces, binding.namespace)) && (allResourceNames || contains(r.config.resourceNames, binding.name))
+			} else if r.config.resourceKind == "serviceaccount" {
 				for _, subject := range binding.subjects {
-					if !r.shouldIgnore(subject.name) {
-						renderSubject := false
-						if r.config.resourceKind == "" {
-							renderSubject = true
-						} else if r.config.resourceKind == "rolebinding" {
-							renderSubject = true
-						} else if r.config.resourceKind == "serviceaccount" {
-							renderSubject = (allNamespaces || contains(r.config.namespaces, subject.namespace)) && (allResourceNames || contains(r.config.resourceNames, subject.name))
-						}
-
-						if renderSubject {
-							gns := r.existingOrNewNamespaceSubgraph(g, nsSubgraphs, subject.namespace)
-							subjectNode := r.existingOrNewSubjectNode(gns, subjectNodes, subject.kind, subject.namespace, subject.name)
-							saNodes = append(saNodes, subjectNode)
-						}
+					if subject.kind == "ServiceAccount" && (allNamespaces || contains(r.config.namespaces, subject.namespace)) && (allResourceNames || contains(r.config.resourceNames, subject.name)) {
+						renderBinding = true
+						break
 					}
 				}
+			}
 
-				for _, saNode := range saNodes {
-					saNode.Edge(bindingNode).Attr("dir", "back")
+			if !renderBinding {
+				continue
+			}
+
+			gns := r.existingOrNewNamespaceSubgraph(g, nsSubgraphs, binding.namespace)
+			bindingNode := r.renderBindingAndRole(gns, binding.NamespacedName, binding.role, p)
+
+			saNodes := []dot.Node{}
+			for _, subject := range binding.subjects {
+				if !r.shouldIgnore(subject.name) {
+					renderSubject := false
+					if r.config.resourceKind == "" {
+						renderSubject = true
+					} else if r.config.resourceKind == "rolebinding" {
+						renderSubject = true
+					} else if r.config.resourceKind == "serviceaccount" {
+						renderSubject = (allNamespaces || contains(r.config.namespaces, subject.namespace)) && (allResourceNames || contains(r.config.resourceNames, subject.name))
+					}
+
+					if renderSubject {
+						gns := r.existingOrNewNamespaceSubgraph(g, nsSubgraphs, subject.namespace)
+						subjectNode := r.existingOrNewSubjectNode(gns, subjectNodes, subject.kind, subject.namespace, subject.name)
+						saNodes = append(saNodes, subjectNode)
+					}
 				}
+			}
+
+			for _, saNode := range saNodes {
+				saNode.Edge(bindingNode).Attr("dir", "back")
 			}
 		}
 	}

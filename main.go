@@ -159,27 +159,27 @@ func getPermissions() (Permissions, error) {
 	p := Permissions{}
 	sa, err := getServiceAccounts()
 	if err != nil {
- 		return p, err
+		return p, err
 	}
-	p.ServiceAccounts = sa 
+	p.ServiceAccounts = sa
 	roles, err := getRoles()
 	if err != nil {
- 		return p, err
+		return p, err
 	}
 	p.Roles = roles
 	rb, err := getRoleBindings()
 	if err != nil {
- 		return p, err
+		return p, err
 	}
 	p.RoleBindings = rb
 	cr, err := getClusterRoles()
 	if err != nil {
- 		return p, err
+		return p, err
 	}
 	p.ClusterRoles = cr
 	crb, err := getClusterRoleBindings()
 	if err != nil {
- 		return p, err
+		return p, err
 	}
 	p.ClusterRoleBindings = crb
 	return p, nil
@@ -196,11 +196,13 @@ func lookupRoles(namespace, sa string, p Permissions) (roles []string, err error
 		}
 		roleRef := d["roleRef"].(map[string]interface{})
 		r := roleRef["name"].(string)
-		subjects := d["subjects"].([]interface{})
-		for _, subject := range subjects {
-			s := subject.(map[string]interface{})
-			if s["name"] == sa {
-				roles = append(roles, r)
+		if d["subjects"] != nil {
+			subjects := d["subjects"].([]interface{})
+			for _, subject := range subjects {
+				s := subject.(map[string]interface{})
+				if s["name"] == sa {
+					roles = append(roles, r)
+				}
 			}
 		}
 	}
@@ -218,13 +220,16 @@ func lookupClusterRoles(sa string, p Permissions) (clusterroles []string, err er
 		}
 		roleRef := d["roleRef"].(map[string]interface{})
 		r := roleRef["name"].(string)
-		subjects := d["subjects"].([]interface{})
-		for _, subject := range subjects {
-			s := subject.(map[string]interface{})
-			if s["name"] == sa {
-				clusterroles = append(clusterroles, r)
+		if d["subjects"] != nil {
+			subjects := d["subjects"].([]interface{})
+			for _, subject := range subjects {
+				s := subject.(map[string]interface{})
+				if s["name"] == sa {
+					clusterroles = append(clusterroles, r)
+				}
 			}
 		}
+
 	}
 	return clusterroles, nil
 }
@@ -233,7 +238,7 @@ func lookupClusterRoles(sa string, p Permissions) (clusterroles []string, err er
 // if namespace is empty then the scope is cluster-wide.
 func lookupResources(namespace, role string, p Permissions) (resources string, err error) {
 	if namespace != "" { // look up in roles
-		for _, roles := range p.Roles[namespace] {	
+		for _, roles := range p.Roles[namespace] {
 			var d map[string]interface{}
 			b := []byte(roles)
 			err = json.Unmarshal(b, &d)
@@ -253,7 +258,7 @@ func lookupResources(namespace, role string, p Permissions) (resources string, e
 		}
 	}
 	// ... otherwise, look up in cluster roles:
-	for _, cr := range p.ClusterRoles {	
+	for _, cr := range p.ClusterRoles {
 		var d map[string]interface{}
 		b := []byte(cr)
 		err = json.Unmarshal(b, &d)
@@ -330,12 +335,12 @@ func genGraph(p Permissions) *dot.Graph {
 	}
 	return g
 }
- 
+
 // struct2json turns a map into a JSON string
-func struct2json(s map[string]interface{})(string, error){
+func struct2json(s map[string]interface{}) (string, error) {
 	str, err := json.Marshal(s)
 	if err != nil {
-	    return "", err
+		return "", err
 	}
 	return string(str), nil
 }

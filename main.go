@@ -26,11 +26,11 @@ type Config struct {
 }
 
 type Permissions struct {
-	ServiceAccounts     map[string][]string
-	Roles               map[string][]string
-	ClusterRoles        []string
-	RoleBindings        map[string][]string
-	ClusterRoleBindings []string
+	ServiceAccounts     map[string]map[string]string // map[namespace]map[name]json
+	Roles               map[string]map[string]string
+	ClusterRoles        map[string]string
+	RoleBindings        map[string]map[string]string
+	ClusterRoleBindings map[string]string
 }
 
 func main() {
@@ -106,7 +106,7 @@ func item2Name(name, namespace string, item map[string]interface{}) string {
 }
 
 // getServiceAccounts retrieves data about service accounts across all namespaces
-func (r *Rback) getServiceAccounts(namespaces, names []string) (result map[string][]string, err error) {
+func (r *Rback) getServiceAccounts(namespaces, names []string) (result map[string]map[string]string, err error) {
 	return r.getNamespacedResources("sa", namespaces, names, item2Name)
 }
 
@@ -123,17 +123,17 @@ func item2json(name, namespace string, item map[string]interface{}) string {
 }
 
 // getRoles retrieves data about roles across all namespaces
-func (r *Rback) getRoles() (result map[string][]string, err error) {
+func (r *Rback) getRoles() (result map[string]map[string]string, err error) {
 	return r.getNamespacedResources("roles", []string{""}, []string{}, item2json)
 }
 
 // getRoleBindings retrieves data about roles across all namespaces
-func (r *Rback) getRoleBindings(namespaces, names []string) (result map[string][]string, err error) {
+func (r *Rback) getRoleBindings(namespaces, names []string) (result map[string]map[string]string, err error) {
 	return r.getNamespacedResources("rolebindings", namespaces, names, item2json)
 }
 
-func (r *Rback) getNamespacedResources(kind string, namespaces, names []string, mapFunc func(name, namespace string, item map[string]interface{}) string) (result map[string][]string, err error) {
-	result = make(map[string][]string)
+func (r *Rback) getNamespacedResources(kind string, namespaces, names []string, mapFunc func(name, namespace string, item map[string]interface{}) string) (result map[string]map[string]string, err error) {
+	result = make(map[string]map[string]string)
 	for _, namespace := range namespaces {
 		var args []string
 		if namespace == "" {
@@ -160,30 +160,40 @@ func (r *Rback) getNamespacedResources(kind string, namespaces, names []string, 
 				item := i.(map[string]interface{})
 				nn := getNamespacedName(item)
 				if !r.shouldIgnore(nn.name) {
-					result[nn.namespace] = append(result[nn.namespace], mapFunc(nn.name, nn.namespace, item))
+					result[nn.namespace] = ensureMap(result[nn.namespace])
+					result[nn.namespace][nn.name] = mapFunc(nn.name, nn.namespace, item)
 				}
 			}
 		} else {
 			nn := getNamespacedName(d)
-			result[nn.namespace] = append(result[nn.namespace], mapFunc(nn.name, nn.namespace, d))
+			result[nn.namespace] = ensureMap(result[nn.namespace])
+			result[nn.namespace][nn.name] = mapFunc(nn.name, nn.namespace, d)
 		}
 	}
 	return result, nil
 }
 
+// ensureMap is similar to append(), but for maps - it creates a new map if necessary
+func ensureMap(m map[string]string) map[string]string {
+	if m != nil {
+		return m
+	}
+	return make(map[string]string)
+}
+
 // getClusterRoles retrieves data about cluster roles
-func (r *Rback) getClusterRoles() (result []string, err error) {
+func (r *Rback) getClusterRoles() (result map[string]string, err error) {
 	return r.getClusterScopedResources("clusterroles")
 }
 
 // getClusterRoleBindings retrieves data about cluster role bindings
-func (r *Rback) getClusterRoleBindings() (result []string, err error) {
+func (r *Rback) getClusterRoleBindings() (result map[string]string, err error) {
 	return r.getClusterScopedResources("clusterrolebindings")
 
 }
 
-func (r *Rback) getClusterScopedResources(kind string) (result []string, err error) {
-	result = []string{}
+func (r *Rback) getClusterScopedResources(kind string) (result map[string]string, err error) {
+	result = map[string]string{}
 	res, err := kubecuddler.Kubectl(true, true, "", "get", kind, "--output", "json")
 	if err != nil {
 		return result, err
@@ -198,10 +208,10 @@ func (r *Rback) getClusterScopedResources(kind string) (result []string, err err
 	for _, i := range items {
 		item := i.(map[string]interface{})
 		metadata := item["metadata"].(map[string]interface{})
-		name := metadata["name"]
-		if !r.shouldIgnore(name.(string)) {
+		name := metadata["name"].(string)
+		if !r.shouldIgnore(name) {
 			itemJson, _ := struct2json(item)
-			result = append(result, itemJson)
+			result[name] = itemJson
 		}
 	}
 	return result, nil
@@ -264,7 +274,7 @@ type KindNamespacedName struct {
 }
 
 // lookupBindings lists bindings & roles for a given service account
-func (r *Rback) lookupBindings(bindings []string, saName, saNamespace string) (results []Binding, err error) {
+func (r *Rback) lookupBindings(bindings map[string]string, saName, saNamespace string) (results []Binding, err error) {
 	for _, rb := range bindings {
 		var binding map[string]interface{}
 		b := []byte(rb)
@@ -351,22 +361,19 @@ func (r *Rback) lookupResources(namespace, role string) (rules string, err error
 	return clusterRules + rules, nil
 }
 
-func findAccessRules(roles []string, roleName string) (resources string, err error) {
-	for _, roleJson := range roles {
+func findAccessRules(roles map[string]string, roleName string) (resources string, err error) {
+	roleJson, found := roles[roleName]
+	if found {
 		var role map[string]interface{}
 		b := []byte(roleJson)
 		err = json.Unmarshal(b, &role)
 		if err != nil {
 			return "", err
 		}
-		metadata := role["metadata"].(map[string]interface{})
-		name := metadata["name"]
-		if name == roleName {
-			rules := role["rules"].([]interface{})
-			for _, rule := range rules {
-				r := rule.(map[string]interface{})
-				resources += toHumanReadableRule(r) + "\n"
-			}
+		rules := role["rules"].([]interface{})
+		for _, rule := range rules {
+			r := rule.(map[string]interface{})
+			resources += toHumanReadableRule(r) + "\n"
 		}
 	}
 	return resources, nil
@@ -426,15 +433,10 @@ func (r *Rback) genGraph() *dot.Graph {
 		}
 	}
 
-	allBindings := [][]string{
-		r.permissions.ClusterRoleBindings,
-	}
-	for _, roleBindings := range r.permissions.RoleBindings {
-		allBindings = append(allBindings, roleBindings)
-	}
+	r.permissions.RoleBindings[""] = r.permissions.ClusterRoleBindings
 
 	// roles:
-	for _, roleBindings := range allBindings {
+	for _, roleBindings := range r.permissions.RoleBindings {
 		bindings, err := r.lookupBindings(roleBindings, "", "")
 		if err != nil {
 			fmt.Printf("Can't look up roles due to: %v", err)

@@ -221,13 +221,7 @@ func (r *Rback) getPermissions() (Permissions, error) {
 	}
 	p.Roles = roles
 
-	rbNames := []string{}
-	rbNamespaces := []string{}
-	if r.config.resourceKind == "rolebinding" {
-		rbNames = r.config.resourceNames
-		rbNamespaces = r.config.namespaces
-	}
-	rb, err := r.getRoleBindings(rbNamespaces, rbNames)
+	rb, err := r.getRoleBindings([]string{""}, []string{})
 	if err != nil {
 		return p, err
 	}
@@ -413,6 +407,9 @@ func (r *Rback) genGraph(p Permissions) *dot.Graph {
 	nsSubgraphs := map[string]*dot.Graph{}
 	nsSubgraphs[""] = g
 
+	allNamespaces := len(r.config.namespaces) == 1 && r.config.namespaces[0] == ""
+	allResourceNames := len(r.config.resourceNames) == 0
+
 	for _, ns := range r.determineNamespacesToShow(p) {
 		gns := r.existingOrNewNamespaceSubgraph(g, nsSubgraphs, ns)
 
@@ -427,31 +424,77 @@ func (r *Rback) genGraph(p Permissions) *dot.Graph {
 					os.Exit(-2)
 				}
 				for _, binding := range bindings {
-					r.renderRole(g, binding.NamespacedName, binding.role, []dot.Node{sanode}, p)
+					bindingNode := r.renderBindingAndRole(g, binding.NamespacedName, binding.role, p)
+					sanode.Edge(bindingNode).Attr("dir", "back")
 				}
 			}
 		}
 
 		// roles:
-		bindings, err := r.lookupBindings(p.RoleBindings[ns], "", ns)
-		if err != nil {
-			fmt.Printf("Can't look up roles due to: %v", err)
-			os.Exit(-2)
-		}
-		for _, binding := range bindings {
-			saNodes := []dot.Node{}
-			for _, subject := range binding.subjects {
-				if !r.shouldIgnore(subject.name) {
-					gns := r.existingOrNewNamespaceSubgraph(g, nsSubgraphs, subject.namespace)
-					subjectNode := r.existingOrNewSubjectNode(gns, subjectNodes, subject.kind, subject.namespace, subject.name)
-					saNodes = append(saNodes, subjectNode)
+		for _, roleBindings := range p.RoleBindings {
+			bindings, err := r.lookupBindings(roleBindings, "", ns)
+			if err != nil {
+				fmt.Printf("Can't look up roles due to: %v", err)
+				os.Exit(-2)
+			}
+			for _, binding := range bindings {
+				renderBinding := false
+				if r.config.resourceKind == "" {
+					renderBinding = allNamespaces || contains(r.config.namespaces, binding.namespace)
+				} else if r.config.resourceKind == "rolebinding" {
+					renderBinding = (allNamespaces || contains(r.config.namespaces, binding.namespace)) && (allResourceNames || contains(r.config.resourceNames, binding.name))
+				} else if r.config.resourceKind == "serviceaccount" {
+					for _, subject := range binding.subjects {
+						if subject.kind == "ServiceAccount" && (allNamespaces || contains(r.config.namespaces, subject.namespace)) && (allResourceNames || contains(r.config.resourceNames, subject.name)) {
+							renderBinding = true
+							break
+						}
+					}
+				}
+
+				if !renderBinding {
+					continue
+				}
+
+				gns := r.existingOrNewNamespaceSubgraph(g, nsSubgraphs, binding.namespace)
+				bindingNode := r.renderBindingAndRole(gns, binding.NamespacedName, binding.role, p)
+
+				saNodes := []dot.Node{}
+				for _, subject := range binding.subjects {
+					if !r.shouldIgnore(subject.name) {
+						renderSubject := false
+						if r.config.resourceKind == "" {
+							renderSubject = true
+						} else if r.config.resourceKind == "rolebinding" {
+							renderSubject = true
+						} else if r.config.resourceKind == "serviceaccount" {
+							renderSubject = (allNamespaces || contains(r.config.namespaces, subject.namespace)) && (allResourceNames || contains(r.config.resourceNames, subject.name))
+						}
+
+						if renderSubject {
+							gns := r.existingOrNewNamespaceSubgraph(g, nsSubgraphs, subject.namespace)
+							subjectNode := r.existingOrNewSubjectNode(gns, subjectNodes, subject.kind, subject.namespace, subject.name)
+							saNodes = append(saNodes, subjectNode)
+						}
+					}
+				}
+
+				for _, saNode := range saNodes {
+					saNode.Edge(bindingNode).Attr("dir", "back")
 				}
 			}
-
-			r.renderRole(gns, binding.NamespacedName, binding.role, saNodes, p)
 		}
 	}
 	return g
+}
+
+func contains(values []string, value string) bool {
+	for _, v := range values {
+		if value == v {
+			return true
+		}
+	}
+	return false
 }
 
 func (r *Rback) determineNamespacesToShow(p Permissions) (namespaces []string) {
@@ -539,7 +582,7 @@ func (r *Rback) renderLegend(g *dot.Graph) {
 	}
 }
 
-func (r *Rback) renderRole(g *dot.Graph, binding, role NamespacedName, saNodes []dot.Node, p Permissions) {
+func (r *Rback) renderBindingAndRole(g *dot.Graph, binding, role NamespacedName, p Permissions) dot.Node {
 	var roleNode dot.Node
 
 	isClusterRole := role.namespace == ""
@@ -557,9 +600,6 @@ func (r *Rback) renderRole(g *dot.Graph, binding, role NamespacedName, saNodes [
 		roleBindingNode = newRoleBindingNode(g, binding.name)
 	}
 	roleBindingNode.Edge(roleNode)
-	for _, saNode := range saNodes {
-		saNode.Edge(roleBindingNode).Attr("dir", "back")
-	}
 
 	if r.config.renderRules {
 		rules, err := r.lookupResources(binding.namespace, role.name, p)
@@ -572,6 +612,8 @@ func (r *Rback) renderRole(g *dot.Graph, binding, role NamespacedName, saNodes [
 			g.Edge(roleNode, resnode)
 		}
 	}
+
+	return roleBindingNode
 }
 
 // struct2json turns a map into a JSON string

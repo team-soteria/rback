@@ -72,6 +72,8 @@ func main() {
 var kindMap = map[string]string{
 	"sa":              "serviceaccount",
 	"serviceaccounts": "serviceaccount",
+	"rb":              "rolebinding",
+	"rolebindings":    "rolebinding",
 }
 
 func normalizeKind(kind string) string {
@@ -143,35 +145,52 @@ func getNamespacedName(obj map[string]interface{}) NamespacedName {
 
 // getRoles retrieves data about roles across all namespaces
 func (r *Rback) getRoles() (result map[string][]string, err error) {
-	return r.getNamespacedResources("roles")
+	return r.getNamespacedResources("roles", []string{""}, []string{})
 }
 
 // getRoleBindings retrieves data about roles across all namespaces
-func (r *Rback) getRoleBindings() (result map[string][]string, err error) {
-	return r.getNamespacedResources("rolebindings")
+func (r *Rback) getRoleBindings(namespaces, names []string) (result map[string][]string, err error) {
+	return r.getNamespacedResources("rolebindings", namespaces, names)
 }
 
-func (r *Rback) getNamespacedResources(kind string) (result map[string][]string, err error) {
-	res, err := kubecuddler.Kubectl(true, true, "", "get", kind, "--all-namespaces", "--output", "json")
+func (r *Rback) getNamespacedResources(kind string, namespaces, names []string) (result map[string][]string, err error) {
 	result = make(map[string][]string)
-	if err != nil {
-		return result, err
-	}
-	var d map[string]interface{}
-	b := []byte(res)
-	err = json.Unmarshal(b, &d)
-	if err != nil {
-		return result, err
-	}
-	items := d["items"].([]interface{})
-	for _, i := range items {
-		item := i.(map[string]interface{})
-		metadata := item["metadata"].(map[string]interface{})
-		name := metadata["name"]
-		ns := metadata["namespace"]
-		if !r.shouldIgnore(name.(string)) {
-			itemJson, _ := struct2json(item)
-			result[ns.(string)] = append(result[ns.(string)], itemJson)
+	for _, namespace := range namespaces {
+		var args []string
+		if namespace == "" {
+			args = []string{kind, "--all-namespaces", "--output", "json"}
+		} else if len(names) == 0 {
+			args = []string{kind, "-n", namespace, "--output", "json"}
+		} else {
+			args = append([]string{kind, "-n", namespace, "--output", "json"}, names...)
+		}
+		res, err := kubecuddler.Kubectl(true, true, "", "get", args...)
+		if err != nil {
+			return result, err
+		}
+		var d map[string]interface{}
+		b := []byte(res)
+		err = json.Unmarshal(b, &d)
+		if err != nil {
+			return result, err
+		}
+
+		if d["kind"] == "List" {
+			items := d["items"].([]interface{})
+			for _, i := range items {
+				item := i.(map[string]interface{})
+				metadata := item["metadata"].(map[string]interface{})
+				name := metadata["name"]
+				ns := metadata["namespace"]
+				if !r.shouldIgnore(name.(string)) {
+					itemJson, _ := struct2json(item)
+					result[ns.(string)] = append(result[ns.(string)], itemJson)
+				}
+			}
+		} else {
+			namespacedName := getNamespacedName(d)
+			itemJson, _ := struct2json(d)
+			result[namespacedName.namespace] = append(result[namespacedName.namespace], itemJson)
 		}
 	}
 	return result, nil
@@ -227,21 +246,31 @@ func (r *Rback) getPermissions() (Permissions, error) {
 		return p, err
 	}
 	p.ServiceAccounts = sa
+
 	roles, err := r.getRoles()
 	if err != nil {
 		return p, err
 	}
 	p.Roles = roles
-	rb, err := r.getRoleBindings()
+
+	rbNames := []string{}
+	rbNamespaces := []string{}
+	if r.config.resourceKind == "rolebinding" {
+		rbNames = r.config.resourceNames
+		rbNamespaces = r.config.namespaces
+	}
+	rb, err := r.getRoleBindings(rbNamespaces, rbNames)
 	if err != nil {
 		return p, err
 	}
 	p.RoleBindings = rb
+
 	cr, err := r.getClusterRoles()
 	if err != nil {
 		return p, err
 	}
 	p.ClusterRoles = cr
+
 	crb, err := r.getClusterRoleBindings()
 	if err != nil {
 		return p, err
@@ -419,17 +448,19 @@ func (r *Rback) genGraph(p Permissions) *dot.Graph {
 	for _, ns := range r.determineNamespacesToShow(p) {
 		gns := r.existingOrNewNamespaceSubgraph(g, nsSubgraphs, ns)
 
-		for _, sa := range p.ServiceAccounts[ns] {
-			sanode := r.existingOrNewSubjectNode(gns, subjectNodes, "ServiceAccount", ns, sa)
+		if r.config.resourceKind != "rolebinding" {
+			for _, sa := range p.ServiceAccounts[ns] {
+				sanode := r.existingOrNewSubjectNode(gns, subjectNodes, "ServiceAccount", ns, sa)
 
-			// cluster roles:
-			bindings, err := r.lookupBindings(p.ClusterRoleBindings, sa, ns)
-			if err != nil {
-				fmt.Printf("Can't look up cluster roles due to: %v", err)
-				os.Exit(-2)
-			}
-			for _, binding := range bindings {
-				r.renderRole(g, binding.NamespacedName, binding.role, []dot.Node{sanode}, p)
+				// cluster roles:
+				bindings, err := r.lookupBindings(p.ClusterRoleBindings, sa, ns)
+				if err != nil {
+					fmt.Printf("Can't look up cluster roles due to: %v", err)
+					os.Exit(-2)
+				}
+				for _, binding := range bindings {
+					r.renderRole(g, binding.NamespacedName, binding.role, []dot.Node{sanode}, p)
+				}
 			}
 		}
 

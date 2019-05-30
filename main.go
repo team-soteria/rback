@@ -76,6 +76,8 @@ var kindMap = map[string]string{
 	"rolebindings":        "rolebinding",
 	"crb":                 "clusterrolebinding",
 	"clusterrolebindings": "clusterrolebinding",
+	"r":                   "role",
+	"roles":               "role",
 }
 
 func normalizeKind(kind string) string {
@@ -451,6 +453,8 @@ func (r *Rback) genGraph(p Permissions) *dot.Graph {
 						break
 					}
 				}
+			} else if r.config.resourceKind == "role" {
+				renderBinding = (allNamespaces || contains(r.config.namespaces, binding.role.namespace)) && (allResourceNames || contains(r.config.resourceNames, binding.role.name))
 			}
 
 			if !renderBinding {
@@ -472,6 +476,8 @@ func (r *Rback) genGraph(p Permissions) *dot.Graph {
 						renderSubject = true
 					} else if r.config.resourceKind == "serviceaccount" {
 						renderSubject = (allNamespaces || contains(r.config.namespaces, subject.namespace)) && (allResourceNames || contains(r.config.resourceNames, subject.name))
+					} else if r.config.resourceKind == "role" {
+						renderSubject = true
 					}
 
 					if renderSubject {

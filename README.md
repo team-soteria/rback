@@ -10,6 +10,12 @@ Another example would be a local K3S cluster:
 
 ![K3S cluster](examples/k3s.dot.png)
 
+Here in action in the [Katacoda Kubernetes playground](https://www.katacoda.com/courses/kubernetes/playground):
+
+![Katacoda](examples/katacoda.dot.png)
+
+See for more details the [examples/](examples/) directory …
+
 ## Install
 
 `rback` depends on you having access to a Kubernetes cluster, either in the cloud (like Amazon EKS)

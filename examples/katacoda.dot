@@ -1,0 +1,71 @@
+digraph  {
+        subgraph cluster_s0 {
+                ID = "cluster_s0";
+                label="default";
+                n4[fillcolor="#2f6de1",fontcolor="#f0f0f0",label="default",style="filled"];
+
+        }subgraph cluster_s1 {
+                ID = "cluster_s1";
+                label="kube-public";
+                n5[fillcolor="#2f6de1",fontcolor="#f0f0f0",label="default",style="filled"];
+
+        }subgraph cluster_s2 {
+                ID = "cluster_s2";
+                label="kube-system";
+                n6[fillcolor="#2f6de1",fontcolor="#f0f0f0",label="attachdetach-controller",style="filled"];
+                n7[fillcolor="#2f6de1",fontcolor="#f0f0f0",label="bootstrap-signer",style="filled"];
+                n10[fillcolor="#2f6de1",fontcolor="#f0f0f0",label="certificate-controller",style="filled"];
+                n11[fillcolor="#2f6de1",fontcolor="#f0f0f0",label="clusterrole-aggregation-controller",style="filled"];
+                n12[fillcolor="#2f6de1",fontcolor="#f0f0f0",label="coredns",style="filled"];
+                n13[fillcolor="#2f6de1",fontcolor="#f0f0f0",label="cronjob-controller",style="filled"];
+                n14[fillcolor="#2f6de1",fontcolor="#f0f0f0",label="daemon-set-controller",style="filled"];
+                n15[fillcolor="#2f6de1",fontcolor="#f0f0f0",label="default",style="filled"];
+                n16[fillcolor="#2f6de1",fontcolor="#f0f0f0",label="deployment-controller",style="filled"];
+                n17[fillcolor="#2f6de1",fontcolor="#f0f0f0",label="disruption-controller",style="filled"];
+                n18[fillcolor="#2f6de1",fontcolor="#f0f0f0",label="endpoint-controller",style="filled"];
+                n19[fillcolor="#2f6de1",fontcolor="#f0f0f0",label="expand-controller",style="filled"];
+                n20[fillcolor="#2f6de1",fontcolor="#f0f0f0",label="generic-garbage-collector",style="filled"];
+                n21[fillcolor="#2f6de1",fontcolor="#f0f0f0",label="horizontal-pod-autoscaler",style="filled"];
+                n22[fillcolor="#2f6de1",fontcolor="#f0f0f0",label="job-controller",style="filled"];
+                n23[fillcolor="#2f6de1",fontcolor="#f0f0f0",label="kube-proxy",style="filled"];
+                n25[fillcolor="#2f6de1",fontcolor="#f0f0f0",label="namespace-controller",style="filled"];
+                n26[fillcolor="#2f6de1",fontcolor="#f0f0f0",label="node-controller",style="filled"];
+                n27[fillcolor="#2f6de1",fontcolor="#f0f0f0",label="persistent-volume-binder",style="filled"];
+                n28[fillcolor="#2f6de1",fontcolor="#f0f0f0",label="pod-garbage-collector",style="filled"];
+                n29[fillcolor="#2f6de1",fontcolor="#f0f0f0",label="pv-protection-controller",style="filled"];
+                n30[fillcolor="#2f6de1",fontcolor="#f0f0f0",label="pvc-protection-controller",style="filled"];
+                n31[fillcolor="#2f6de1",fontcolor="#f0f0f0",label="replicaset-controller",style="filled"];
+                n32[fillcolor="#2f6de1",fontcolor="#f0f0f0",label="replication-controller",style="filled"];
+                n33[fillcolor="#2f6de1",fontcolor="#f0f0f0",label="resourcequota-controller",style="filled"];
+                n34[fillcolor="#2f6de1",fontcolor="#f0f0f0",label="service-account-controller",style="filled"];
+                n35[fillcolor="#2f6de1",fontcolor="#f0f0f0",label="service-controller",style="filled"];
+                n36[fillcolor="#2f6de1",fontcolor="#f0f0f0",label="statefulset-controller",style="filled"];
+                n8[fillcolor="#ff9900",fontcolor="#030303",label="system:controller:bootstrap-signer",style="filled"];
+                n38[fillcolor="#ff9900",fontcolor="#030303",label="system:controller:token-cleaner",style="filled"];
+                n37[fillcolor="#2f6de1",fontcolor="#f0f0f0",label="token-cleaner",style="filled"];
+                n40[fillcolor="#2f6de1",fontcolor="#f0f0f0",label="ttl-controller",style="filled"];
+                n41[fillcolor="#ff9900",fontcolor="#030303",label="weave-net",style="filled"];
+                n44[label="{\"apiGroups\":[\"\"],\"resourceNames\":[\"weave-net\"],\"resources\":[\"configmaps\"],\"verbs\":[\"get\",\"update\"]}\n{\"apiGroups\":[\"\"],\"resources\":[\"configmaps\"],\"verbs\":[\"create\"]}\n{\"apiGroups\":[\"\"],\"resources\":[\"pods\",\"namespaces\",\"nodes\"],\"verbs\":[\"get\",\"list\",\"watch\"]}\n{\"apiGroups\":[\"networking.k8s.io\"],\"resources\":[\"networkpolicies\"],\"verbs\":[\"get\",\"list\",\"watch\"]}\n"];
+                n39[label="{\"apiGroups\":[\"\"],\"resources\":[\"secrets\"],\"verbs\":[\"delete\",\"get\",\"list\",\"watch\"]}\n{\"apiGroups\":[\"\"],\"resources\":[\"events\"],\"verbs\":[\"create\",\"patch\",\"update\"]}\n"];
+                n9[label="{\"apiGroups\":[\"\"],\"resources\":[\"secrets\"],\"verbs\":[\"get\",\"list\",\"watch\"]}\n"];
+                n7->n8;
+                n8->n9;
+                n38->n39;
+                n37->n38;
+                n41->n41;
+                n41->n44;
+
+        }
+        n2[fillcolor="#ff9900",fontcolor="#030303",label="(CLUSTER) ROLE",style="filled"];
+        n3[label="ACCESS RULES"];
+        n1[fillcolor="#2f6de1",fontcolor="#f0f0f0",label="SERVICE ACCOUNT",style="filled"];
+        n24[fillcolor="#ff9900",fontcolor="#030303",label="system:node-proxier",style="filled"];
+        n42[fillcolor="#ff9900",fontcolor="#030303",label="weave-net",style="filled"];
+        n43[label="{\"apiGroups\":[\"\"],\"resources\":[\"pods\",\"namespaces\",\"nodes\"],\"verbs\":[\"get\",\"list\",\"watch\"]}\n{\"apiGroups\":[\"networking.k8s.io\"],\"resources\":[\"networkpolicies\"],\"verbs\":[\"get\",\"list\",\"watch\"]}\n"];
+        n2->n3;
+        n1->n2;
+        n23->n24;
+        n41->n42;
+        n42->n43;
+
+}

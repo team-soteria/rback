@@ -410,10 +410,10 @@ func (r *Rback) genGraph(p Permissions) *dot.Graph {
 	allNamespaces := len(r.config.namespaces) == 1 && r.config.namespaces[0] == ""
 	allResourceNames := len(r.config.resourceNames) == 0
 
-	for _, ns := range r.determineNamespacesToShow(p) {
-		gns := r.existingOrNewNamespaceSubgraph(g, nsSubgraphs, ns)
+	if r.config.resourceKind == "" || r.config.resourceKind == "serviceaccount" {
+		for _, ns := range r.determineNamespacesToShow(p) {
+			gns := r.existingOrNewNamespaceSubgraph(g, nsSubgraphs, ns)
 
-		if r.config.resourceKind != "rolebinding" {
 			for _, sa := range p.ServiceAccounts[ns] {
 				sanode := r.existingOrNewSubjectNode(gns, subjectNodes, "ServiceAccount", ns, sa)
 

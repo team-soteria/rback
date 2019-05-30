@@ -14,6 +14,9 @@ import (
 type Rback struct {
 	config      Config
 	permissions Permissions
+
+	nsSubgraphs  map[string]*dot.Graph
+	subjectNodes map[KindNamespacedName]dot.Node
 }
 
 type Config struct {
@@ -405,20 +408,21 @@ func (r *Rback) genGraph() *dot.Graph {
 	g.Attr("newrank", "true") // global rank instead of per-subgraph (ensures access rules are always in the same place (at bottom))
 	r.renderLegend(g)
 
-	subjectNodes := map[KindNamespacedName]dot.Node{}
-	nsSubgraphs := map[string]*dot.Graph{}
-	nsSubgraphs[""] = g
+	r.nsSubgraphs = make(map[string]*dot.Graph)
+	r.nsSubgraphs[""] = g
+
+	r.subjectNodes = make(map[KindNamespacedName]dot.Node)
 
 	if r.config.resourceKind == "" || r.config.resourceKind == "serviceaccount" {
 		for _, ns := range r.determineNamespacesToShow(r.permissions) {
-			gns := r.existingOrNewNamespaceSubgraph(g, nsSubgraphs, ns)
+			gns := r.existingOrNewNamespaceSubgraph(g, ns)
 
 			for sa, _ := range r.permissions.ServiceAccounts[ns] {
 				renderSA := (r.config.resourceKind == "") ||
 					((r.allNamespaces() || contains(r.config.namespaces, ns)) &&
 						(r.allResourceNames() || contains(r.config.resourceNames, sa)))
 				if renderSA {
-					r.existingOrNewSubjectNode(gns, subjectNodes, "ServiceAccount", ns, sa)
+					r.existingOrNewSubjectNode(gns, "ServiceAccount", ns, sa)
 				}
 			}
 		}
@@ -438,7 +442,7 @@ func (r *Rback) genGraph() *dot.Graph {
 				continue
 			}
 
-			gns := r.existingOrNewNamespaceSubgraph(g, nsSubgraphs, binding.namespace)
+			gns := r.existingOrNewNamespaceSubgraph(g, binding.namespace)
 
 			var bindingNode dot.Node
 			isClusterRoleBinding := binding.namespace == ""
@@ -481,8 +485,8 @@ func (r *Rback) genGraph() *dot.Graph {
 						(r.allResourceNames() || contains(r.config.resourceNames, subject.name)))
 
 				if renderSubject {
-					gns := r.existingOrNewNamespaceSubgraph(g, nsSubgraphs, subject.namespace)
-					subjectNode := r.existingOrNewSubjectNode(gns, subjectNodes, subject.kind, subject.namespace, subject.name)
+					gns := r.existingOrNewNamespaceSubgraph(g, subject.namespace)
+					subjectNode := r.existingOrNewSubjectNode(gns, subject.kind, subject.namespace, subject.name)
 					saNodes = append(saNodes, subjectNode)
 				}
 			}
@@ -561,21 +565,21 @@ func (r *Rback) determineNamespacesToShow(p Permissions) (namespaces []string) {
 	}
 }
 
-func (r *Rback) existingOrNewSubjectNode(gns *dot.Graph, subjectNodes map[KindNamespacedName]dot.Node, kind string, ns string, name string) dot.Node {
+func (r *Rback) existingOrNewSubjectNode(gns *dot.Graph, kind string, ns string, name string) dot.Node {
 	knn := KindNamespacedName{kind, NamespacedName{ns, name}}
-	node, found := subjectNodes[knn]
+	node, found := r.subjectNodes[knn]
 	if !found {
 		node = r.newSubjectNode(gns, kind, name, r.subjectExists(kind, ns, name), r.isFocused(strings.ToLower(kind), ns, name))
-		subjectNodes[knn] = node
+		r.subjectNodes[knn] = node
 	}
 	return node
 }
 
-func (r *Rback) existingOrNewNamespaceSubgraph(g *dot.Graph, nsSubgraphs map[string]*dot.Graph, ns string) *dot.Graph {
-	gns := nsSubgraphs[ns]
+func (r *Rback) existingOrNewNamespaceSubgraph(g *dot.Graph, ns string) *dot.Graph {
+	gns := r.nsSubgraphs[ns]
 	if gns == nil {
 		gns = r.newNamespaceSubgraph(g, ns)
-		nsSubgraphs[ns] = gns
+		r.nsSubgraphs[ns] = gns
 	}
 	return gns
 }

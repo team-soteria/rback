@@ -417,10 +417,9 @@ func (r *Rback) genGraph() *dot.Graph {
 			gns := r.existingOrNewNamespaceSubgraph(g, nsSubgraphs, ns)
 
 			for sa, _ := range r.permissions.ServiceAccounts[ns] {
-				renderSA := true
-				if r.config.resourceKind == "serviceaccount" {
-					renderSA = (allNamespaces || contains(r.config.namespaces, ns)) && (allResourceNames || contains(r.config.resourceNames, sa))
-				}
+				renderSA := (r.config.resourceKind == "") ||
+					((allNamespaces || contains(r.config.namespaces, ns)) &&
+						(allResourceNames || contains(r.config.resourceNames, sa)))
 				if renderSA {
 					r.existingOrNewSubjectNode(gns, subjectNodes, "ServiceAccount", ns, sa)
 				}
@@ -439,13 +438,14 @@ func (r *Rback) genGraph() *dot.Graph {
 		}
 		for _, binding := range bindings {
 			renderBinding := false
-			if r.config.resourceKind == "" {
+			switch r.config.resourceKind {
+			case "":
 				renderBinding = allNamespaces || contains(r.config.namespaces, binding.namespace)
-			} else if r.config.resourceKind == "rolebinding" {
+			case "rolebinding":
 				renderBinding = (allNamespaces || contains(r.config.namespaces, binding.namespace)) && (allResourceNames || contains(r.config.resourceNames, binding.name))
-			} else if r.config.resourceKind == "clusterrolebinding" {
+			case "clusterrolebinding":
 				renderBinding = binding.namespace == "" && (allResourceNames || contains(r.config.resourceNames, binding.name))
-			} else if r.config.resourceKind == "serviceaccount" {
+			case "serviceaccount":
 				for _, subject := range binding.subjects {
 					if subject.kind == "ServiceAccount" &&
 						(allNamespaces || contains(r.config.namespaces, subject.namespace)) &&
@@ -455,9 +455,9 @@ func (r *Rback) genGraph() *dot.Graph {
 						break
 					}
 				}
-			} else if r.config.resourceKind == "role" {
+			case "role":
 				renderBinding = (allNamespaces || contains(r.config.namespaces, binding.role.namespace)) && (allResourceNames || contains(r.config.resourceNames, binding.role.name))
-			} else if r.config.resourceKind == "clusterrole" {
+			case "clusterrole":
 				renderBinding = (binding.role.namespace == "" || allNamespaces || contains(r.config.namespaces, binding.role.namespace)) && (allResourceNames || contains(r.config.resourceNames, binding.role.name))
 			}
 
@@ -470,27 +470,17 @@ func (r *Rback) genGraph() *dot.Graph {
 
 			saNodes := []dot.Node{}
 			for _, subject := range binding.subjects {
-				if !r.shouldIgnore(subject.name) {
-					renderSubject := false
-					if r.config.resourceKind == "" {
-						renderSubject = true
-					} else if r.config.resourceKind == "rolebinding" {
-						renderSubject = true
-					} else if r.config.resourceKind == "clusterrolebinding" {
-						renderSubject = true
-					} else if r.config.resourceKind == "serviceaccount" {
-						renderSubject = (allNamespaces || contains(r.config.namespaces, subject.namespace)) && (allResourceNames || contains(r.config.resourceNames, subject.name))
-					} else if r.config.resourceKind == "role" {
-						renderSubject = true
-					} else if r.config.resourceKind == "clusterrole" {
-						renderSubject = true
-					}
+				if r.shouldIgnore(subject.name) {
+					continue
+				}
+				renderSubject := (r.config.resourceKind != "serviceaccount") ||
+					((allNamespaces || contains(r.config.namespaces, subject.namespace)) &&
+						(allResourceNames || contains(r.config.resourceNames, subject.name)))
 
-					if renderSubject {
-						gns := r.existingOrNewNamespaceSubgraph(g, nsSubgraphs, subject.namespace)
-						subjectNode := r.existingOrNewSubjectNode(gns, subjectNodes, subject.kind, subject.namespace, subject.name)
-						saNodes = append(saNodes, subjectNode)
-					}
+				if renderSubject {
+					gns := r.existingOrNewNamespaceSubgraph(g, nsSubgraphs, subject.namespace)
+					subjectNode := r.existingOrNewSubjectNode(gns, subjectNodes, subject.kind, subject.namespace, subject.name)
+					saNodes = append(saNodes, subjectNode)
 				}
 			}
 

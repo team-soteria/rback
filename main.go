@@ -444,36 +444,10 @@ func (r *Rback) genGraph() *dot.Graph {
 
 			gns := r.existingOrNewNamespaceSubgraph(g, binding.namespace)
 
-			var bindingNode dot.Node
-			isClusterRoleBinding := binding.namespace == ""
-			if isClusterRoleBinding {
-				bindingNode = r.newClusterRoleBindingNode(gns, binding.name, r.isFocused("clusterrolebinding", "", binding.name))
-			} else {
-				bindingNode = r.newRoleBindingNode(gns, binding.name, r.isFocused("rolebinding", binding.namespace, binding.name))
-			}
-
-			role := binding.role
-			var roleNode dot.Node
-			isClusterRole := role.namespace == ""
-			if isClusterRole {
-				roleNode = r.newClusterRoleNode(gns, binding.namespace, role.name, r.clusterRoleExists(role), r.isFocused("clusterrole", role.namespace, role.name))
-			} else {
-				roleNode = r.newRoleNode(gns, binding.namespace, role.name, r.roleExists(role), r.isFocused("role", role.namespace, role.name))
-			}
+			bindingNode := r.newBindingNode(gns, binding)
+			roleNode := r.newRoleAndRulesNodePair(gns, binding.role)
 
 			bindingNode.Edge(roleNode)
-
-			if r.config.showRules {
-				rules, err := r.lookupResources(binding.namespace, role.name)
-				if err != nil {
-					fmt.Printf("Can't look up entities and resources due to: %v", err)
-					os.Exit(-3)
-				}
-				if rules != "" {
-					rulesNode := newRulesNode(gns, binding.namespace, role.name, rules)
-					gns.Edge(roleNode, rulesNode)
-				}
-			}
 
 			saNodes := []dot.Node{}
 			for _, subject := range binding.subjects {
@@ -563,6 +537,37 @@ func (r *Rback) determineNamespacesToShow(p Permissions) (namespaces []string) {
 	} else {
 		return r.config.namespaces
 	}
+}
+
+func (r *Rback) newBindingNode(gns *dot.Graph, binding Binding) dot.Node {
+	isClusterRoleBinding := binding.namespace == ""
+	if isClusterRoleBinding {
+		return r.newClusterRoleBindingNode(gns, binding.name, r.isFocused("clusterrolebinding", "", binding.name))
+	} else {
+		return r.newRoleBindingNode(gns, binding.name, r.isFocused("rolebinding", binding.namespace, binding.name))
+	}
+}
+
+func (r *Rback) newRoleAndRulesNodePair(gns *dot.Graph, role NamespacedName) dot.Node {
+	var roleNode dot.Node
+	isClusterRole := role.namespace == ""
+	if isClusterRole {
+		roleNode = r.newClusterRoleNode(gns, role.namespace, role.name, r.clusterRoleExists(role), r.isFocused("clusterrole", role.namespace, role.name))
+	} else {
+		roleNode = r.newRoleNode(gns, role.namespace, role.name, r.roleExists(role), r.isFocused("role", role.namespace, role.name))
+	}
+	if r.config.showRules {
+		rules, err := r.lookupResources(role.namespace, role.name)
+		if err != nil {
+			fmt.Printf("Can't look up entities and resources due to: %v", err)
+			os.Exit(-3)
+		}
+		if rules != "" {
+			rulesNode := newRulesNode(gns, role.namespace, role.name, rules)
+			gns.Edge(roleNode, rulesNode)
+		}
+	}
+	return roleNode
 }
 
 func (r *Rback) existingOrNewSubjectNode(gns *dot.Graph, kind string, ns string, name string) dot.Node {

@@ -101,13 +101,9 @@ func (r *Rback) shouldIgnore(name string) bool {
 	return false
 }
 
-func item2Name(name, namespace string, item map[string]interface{}) string {
-	return name
-}
-
 // getServiceAccounts retrieves data about service accounts across all namespaces
 func (r *Rback) getServiceAccounts() (result map[string]map[string]string, err error) {
-	return r.getNamespacedResources("sa", []string{""}, []string{}, item2Name)
+	return r.getNamespacedResources("sa", []string{""}, []string{})
 }
 
 func getNamespacedName(obj map[string]interface{}) NamespacedName {
@@ -117,22 +113,17 @@ func getNamespacedName(obj map[string]interface{}) NamespacedName {
 	return NamespacedName{ns.(string), name.(string)}
 }
 
-func item2json(name, namespace string, item map[string]interface{}) string {
-	itemJson, _ := struct2json(item)
-	return itemJson
-}
-
 // getRoles retrieves data about roles across all namespaces
 func (r *Rback) getRoles() (result map[string]map[string]string, err error) {
-	return r.getNamespacedResources("roles", []string{""}, []string{}, item2json)
+	return r.getNamespacedResources("roles", []string{""}, []string{})
 }
 
 // getRoleBindings retrieves data about roles across all namespaces
 func (r *Rback) getRoleBindings() (result map[string]map[string]string, err error) {
-	return r.getNamespacedResources("rolebindings", []string{""}, []string{}, item2json)
+	return r.getNamespacedResources("rolebindings", []string{""}, []string{})
 }
 
-func (r *Rback) getNamespacedResources(kind string, namespaces, names []string, mapFunc func(name, namespace string, item map[string]interface{}) string) (result map[string]map[string]string, err error) {
+func (r *Rback) getNamespacedResources(kind string, namespaces, names []string) (result map[string]map[string]string, err error) {
 	result = make(map[string]map[string]string)
 	for _, namespace := range namespaces {
 		var args []string
@@ -160,14 +151,16 @@ func (r *Rback) getNamespacedResources(kind string, namespaces, names []string, 
 				item := i.(map[string]interface{})
 				nn := getNamespacedName(item)
 				if !r.shouldIgnore(nn.name) {
+					itemJson, _ := struct2json(item)
 					result[nn.namespace] = ensureMap(result[nn.namespace])
-					result[nn.namespace][nn.name] = mapFunc(nn.name, nn.namespace, item)
+					result[nn.namespace][nn.name] = itemJson
 				}
 			}
 		} else {
 			nn := getNamespacedName(d)
+			itemJson, _ := struct2json(d)
 			result[nn.namespace] = ensureMap(result[nn.namespace])
-			result[nn.namespace][nn.name] = mapFunc(nn.name, nn.namespace, d)
+			result[nn.namespace][nn.name] = itemJson
 		}
 	}
 	return result, nil
@@ -423,7 +416,7 @@ func (r *Rback) genGraph() *dot.Graph {
 		for _, ns := range r.determineNamespacesToShow(r.permissions) {
 			gns := r.existingOrNewNamespaceSubgraph(g, nsSubgraphs, ns)
 
-			for _, sa := range r.permissions.ServiceAccounts[ns] {
+			for sa, _ := range r.permissions.ServiceAccounts[ns] {
 				renderSA := true
 				if r.config.resourceKind == "serviceaccount" {
 					renderSA = (allNamespaces || contains(r.config.namespaces, ns)) && (allResourceNames || contains(r.config.resourceNames, sa))
@@ -719,11 +712,9 @@ func (r *Rback) subjectExists(kind string, ns string, name string) bool {
 		return true // assume users and groups exist
 	}
 
-	if list, ok := r.permissions.ServiceAccounts[ns]; ok {
-		for _, sa := range list {
-			if sa == name {
-				return true
-			}
+	if sas, nsExists := r.permissions.ServiceAccounts[ns]; nsExists {
+		if _, saExists := sas[name]; saExists {
+			return true
 		}
 	}
 	return false

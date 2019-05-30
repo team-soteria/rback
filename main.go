@@ -454,7 +454,10 @@ func (r *Rback) genGraph() *dot.Graph {
 				renderBinding = binding.namespace == "" && (allResourceNames || contains(r.config.resourceNames, binding.name))
 			} else if r.config.resourceKind == "serviceaccount" {
 				for _, subject := range binding.subjects {
-					if subject.kind == "ServiceAccount" && (allNamespaces || contains(r.config.namespaces, subject.namespace)) && (allResourceNames || contains(r.config.resourceNames, subject.name)) {
+					if subject.kind == "ServiceAccount" &&
+						(allNamespaces || contains(r.config.namespaces, subject.namespace)) &&
+						(allResourceNames || contains(r.config.resourceNames, subject.name)) &&
+						r.subjectExists("ServiceAccount", subject.namespace, subject.name) {
 						renderBinding = true
 						break
 					}

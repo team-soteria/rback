@@ -17,7 +17,7 @@ type Rback struct {
 }
 
 type Config struct {
-	renderRules     bool
+	showRules       bool
 	showLegend      bool
 	namespaces      []string
 	ignoredPrefixes []string
@@ -37,7 +37,7 @@ func main() {
 
 	config := Config{}
 	flag.BoolVar(&config.showLegend, "show-legend", true, "Whether to show the legend or not")
-	flag.BoolVar(&config.renderRules, "render-rules", true, "Whether to render RBAC rules (e.g. \"get pods\") or not")
+	flag.BoolVar(&config.showRules, "show-rules", true, "Whether to render RBAC access rules (e.g. \"get pods\") or not")
 
 	var namespaces string
 	flag.StringVar(&namespaces, "n", "", "The namespace to render (also supports multiple, comma-delimited namespaces)")
@@ -592,7 +592,7 @@ func (r *Rback) renderLegend(g *dot.Graph) {
 	sa.Edge(clusterRoleBinding).Attr("dir", "back")
 	clusterRoleBinding.Edge(clusterrole)
 
-	if r.config.renderRules {
+	if r.config.showRules {
 		nsrules := newRulesNode(namespace, "ns", "Role", "Namespace-scoped\naccess rules")
 		legend.Edge(role, nsrules)
 
@@ -624,7 +624,7 @@ func (r *Rback) renderBindingAndRole(g *dot.Graph, binding, role NamespacedName)
 	}
 	roleBindingNode.Edge(roleNode)
 
-	if r.config.renderRules {
+	if r.config.showRules {
 		rules, err := r.lookupResources(binding.namespace, role.name)
 		if err != nil {
 			fmt.Printf("Can't look up entities and resources due to: %v", err)

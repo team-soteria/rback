@@ -12,7 +12,8 @@ import (
 )
 
 type Rback struct {
-	config Config
+	config      Config
+	permissions Permissions
 }
 
 type Config struct {
@@ -60,12 +61,12 @@ func main() {
 
 	rback := Rback{config: config}
 
-	p, err := rback.getPermissions()
+	err := rback.fetchPermissions()
 	if err != nil {
 		fmt.Printf("Can't query permissions due to :%v", err)
 		os.Exit(-1)
 	}
-	g := rback.genGraph(p)
+	g := rback.genGraph()
 	fmt.Println(g.String())
 }
 
@@ -206,45 +207,44 @@ func (r *Rback) getClusterScopedResources(kind string) (result []string, err err
 	return result, nil
 }
 
-// getPermissions retrieves data about all access control related data
+// fetchPermissions retrieves data about all access control related data
 // from service accounts to roles and bindings, both namespaced and the
 // cluster level.
-func (r *Rback) getPermissions() (Permissions, error) {
-	p := Permissions{}
+func (r *Rback) fetchPermissions() error {
 	saNames := []string{}
 	if r.config.resourceKind == "serviceaccount" {
 		saNames = r.config.resourceNames
 	}
 	sa, err := r.getServiceAccounts(r.config.namespaces, saNames)
 	if err != nil {
-		return p, err
+		return err
 	}
-	p.ServiceAccounts = sa
+	r.permissions.ServiceAccounts = sa
 
 	roles, err := r.getRoles()
 	if err != nil {
-		return p, err
+		return err
 	}
-	p.Roles = roles
+	r.permissions.Roles = roles
 
 	rb, err := r.getRoleBindings([]string{""}, []string{})
 	if err != nil {
-		return p, err
+		return err
 	}
-	p.RoleBindings = rb
+	r.permissions.RoleBindings = rb
 
 	cr, err := r.getClusterRoles()
 	if err != nil {
-		return p, err
+		return err
 	}
-	p.ClusterRoles = cr
+	r.permissions.ClusterRoles = cr
 
 	crb, err := r.getClusterRoleBindings()
 	if err != nil {
-		return p, err
+		return err
 	}
-	p.ClusterRoleBindings = crb
-	return p, nil
+	r.permissions.ClusterRoleBindings = crb
+	return nil
 }
 
 type Binding struct {
@@ -336,15 +336,15 @@ func stringOrEmpty(i interface{}) string {
 
 // lookupResources lists resources referenced in a role.
 // if namespace is empty then the scope is cluster-wide.
-func (r *Rback) lookupResources(namespace, role string, p Permissions) (rules string, err error) {
+func (r *Rback) lookupResources(namespace, role string) (rules string, err error) {
 	if namespace != "" { // look up in roles
-		rules, err = findAccessRules(p.Roles[namespace], role)
+		rules, err = findAccessRules(r.permissions.Roles[namespace], role)
 		if err != nil {
 			return "", err
 		}
 	}
 	// ... otherwise, look up in cluster roles:
-	clusterRules, err := findAccessRules(p.ClusterRoles, role)
+	clusterRules, err := findAccessRules(r.permissions.ClusterRoles, role)
 	if err != nil {
 		return "", err
 	}
@@ -404,7 +404,7 @@ func toString(values interface{}) string {
 	return strings.Join(strs, ",")
 }
 
-func (r *Rback) genGraph(p Permissions) *dot.Graph {
+func (r *Rback) genGraph() *dot.Graph {
 	g := dot.NewGraph(dot.Directed)
 	g.Attr("newrank", "true") // global rank instead of per-subgraph (ensures access rules are always in the same place (at bottom))
 	r.renderLegend(g)
@@ -417,19 +417,19 @@ func (r *Rback) genGraph(p Permissions) *dot.Graph {
 	allResourceNames := len(r.config.resourceNames) == 0
 
 	if r.config.resourceKind == "" || r.config.resourceKind == "serviceaccount" {
-		for _, ns := range r.determineNamespacesToShow(p) {
+		for _, ns := range r.determineNamespacesToShow(r.permissions) {
 			gns := r.existingOrNewNamespaceSubgraph(g, nsSubgraphs, ns)
 
-			for _, sa := range p.ServiceAccounts[ns] {
+			for _, sa := range r.permissions.ServiceAccounts[ns] {
 				r.existingOrNewSubjectNode(gns, subjectNodes, "ServiceAccount", ns, sa)
 			}
 		}
 	}
 
 	allBindings := [][]string{
-		p.ClusterRoleBindings,
+		r.permissions.ClusterRoleBindings,
 	}
-	for _, roleBindings := range p.RoleBindings {
+	for _, roleBindings := range r.permissions.RoleBindings {
 		allBindings = append(allBindings, roleBindings)
 	}
 
@@ -466,7 +466,7 @@ func (r *Rback) genGraph(p Permissions) *dot.Graph {
 			}
 
 			gns := r.existingOrNewNamespaceSubgraph(g, nsSubgraphs, binding.namespace)
-			bindingNode := r.renderBindingAndRole(gns, binding.NamespacedName, binding.role, p)
+			bindingNode := r.renderBindingAndRole(gns, binding.NamespacedName, binding.role)
 
 			saNodes := []dot.Node{}
 			for _, subject := range binding.subjects {
@@ -596,7 +596,7 @@ func (r *Rback) renderLegend(g *dot.Graph) {
 	}
 }
 
-func (r *Rback) renderBindingAndRole(g *dot.Graph, binding, role NamespacedName, p Permissions) dot.Node {
+func (r *Rback) renderBindingAndRole(g *dot.Graph, binding, role NamespacedName) dot.Node {
 	var roleNode dot.Node
 
 	isClusterRole := role.namespace == ""
@@ -616,7 +616,7 @@ func (r *Rback) renderBindingAndRole(g *dot.Graph, binding, role NamespacedName,
 	roleBindingNode.Edge(roleNode)
 
 	if r.config.renderRules {
-		rules, err := r.lookupResources(binding.namespace, role.name, p)
+		rules, err := r.lookupResources(binding.namespace, role.name)
 		if err != nil {
 			fmt.Printf("Can't look up entities and resources due to: %v", err)
 			os.Exit(-3)

@@ -689,7 +689,7 @@ func (r *Rback) newClusterRoleNode(g *dot.Graph, namespace, name string, highlig
 	return g.Node("cr-"+namespace+"/"+name).
 		Attr("label", name).
 		Attr("shape", "doubleoctagon").
-		Attr("style", "filled").
+		Attr("style", iff(namespace == "", "filled", "filled,dashed")).
 		Attr("penwidth", iff(highlight, "2.0", "1.0")).
 		Attr("fillcolor", "#ff9900").
 		Attr("fontcolor", "#030303")

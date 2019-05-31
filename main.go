@@ -27,8 +27,7 @@ type Config struct {
 
 type Permissions struct {
 	ServiceAccounts map[string]map[string]string // map[namespace]map[name]json
-	Roles           map[string]map[string]string
-	ClusterRoles    map[string]string
+	Roles           map[string]map[string]string // ClusterRoles are stored in Roles[""]
 	RoleBindings    map[string]map[string]string // ClusterRoleBindings are stored in RoleBindings[""]
 }
 
@@ -235,7 +234,7 @@ func (r *Rback) fetchPermissions() error {
 	if err != nil {
 		return err
 	}
-	r.permissions.ClusterRoles = cr
+	r.permissions.Roles[""] = cr
 
 	crb, err := r.getClusterRoleBindings()
 	if err != nil {
@@ -342,7 +341,7 @@ func (r *Rback) lookupResources(namespace, role string) (rules string, err error
 		}
 	}
 	// ... otherwise, look up in cluster roles:
-	clusterRules, err := findAccessRules(r.permissions.ClusterRoles, role)
+	clusterRules, err := findAccessRules(r.permissions.Roles[""], role)
 	if err != nil {
 		return "", err
 	}
@@ -541,7 +540,7 @@ func (r *Rback) newRoleAndRulesNodePair(gns *dot.Graph, bindingNamespace string,
 	var roleNode dot.Node
 	isClusterRole := role.namespace == ""
 	if isClusterRole {
-		roleNode = r.newClusterRoleNode(gns, bindingNamespace, role.name, r.clusterRoleExists(role), r.isFocused("clusterrole", role.namespace, role.name))
+		roleNode = r.newClusterRoleNode(gns, bindingNamespace, role.name, r.roleExists(role), r.isFocused("clusterrole", role.namespace, role.name))
 	} else {
 		roleNode = r.newRoleNode(gns, role.namespace, role.name, r.roleExists(role), r.isFocused("role", role.namespace, role.name))
 	}
@@ -702,13 +701,6 @@ func (r *Rback) roleExists(role NamespacedName) bool {
 		if _, roleExists := roles[role.name]; roleExists {
 			return true
 		}
-	}
-	return false
-}
-
-func (r *Rback) clusterRoleExists(role NamespacedName) bool {
-	if _, roleExists := r.permissions.ClusterRoles[role.name]; roleExists {
-		return true
 	}
 	return false
 }

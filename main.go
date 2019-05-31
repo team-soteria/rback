@@ -679,9 +679,7 @@ func (r *Rback) newClusterRoleNode(g *dot.Graph, bindingNamespace, roleName stri
 }
 
 func (r *Rback) isFocused(kind string, ns string, name string) bool {
-	return r.config.resourceKind == kind &&
-		(r.namespaceSelected(ns)) &&
-		contains(r.config.resourceNames, name)
+	return r.config.resourceKind == kind && r.namespaceSelected(ns) && r.resourceNameSelected(name)
 }
 
 func (r *Rback) resourceNameSelected(name string) bool {

@@ -1,63 +1,125 @@
 digraph  {
-	subgraph cluster_s2 {
-		ID = "cluster_s2";
-		label="cardassian";
-		n15[fillcolor="#2f6de1",fontcolor="#f0f0f0",label="default",style="filled"];
-		
-	}subgraph cluster_s3 {
-		ID = "cluster_s3";
-		label="cnat";
-		n16[fillcolor="#2f6de1",fontcolor="#f0f0f0",label="default",style="filled"];
-		
-	}subgraph cluster_s4 {
-		ID = "cluster_s4";
-		label="default";
-		n17[fillcolor="#2f6de1",fontcolor="#f0f0f0",label="default",style="filled"];
+	subgraph cluster_s0 {
+		ID = "cluster_s0";
+		subgraph cluster_s0 {
+			ID = "cluster_s0";
+			label="Namespace";style="dashed";
+			n2[color="red",fillcolor="#2f6de1",fontcolor="#030303",label="Missing Subject\n(Kind)",penwidth="2.0",shape="box",style="dotted"];
+			n1[color="black",fillcolor="#2f6de1",fontcolor="#f0f0f0",label="Subject\n(Kind)",penwidth="1.0",shape="box",style="filled"];
+			n4[color="black",fillcolor="#ff9900",fontcolor="#030303",label="ClusterRole",penwidth="1.0",shape="doubleoctagon",style="filled,dashed"];
+			n3[color="black",fillcolor="#ff9900",fontcolor="#030303",label="Role",penwidth="1.0",shape="octagon",style="filled"];
+			n6[fillcolor="#ffcc00",fontcolor="#030303",label="RoleBinding",penwidth="1.0",shape="octagon",style="filled"];
+			n7[fillcolor="#ffcc00",fontcolor="#030303",label="RoleBinding",penwidth="1.0",shape="octagon",style="filled"];
+			n10[label="Namespace-scoped\naccess rules",shape="note"];
+			n9[label="Namespace-scoped\laccess rules",shape="note"];
+			n2->n6[dir="back"];
+			n1->n6[dir="back"];
+			n1->n7[dir="back"];
+			n4->n10;
+			n3->n9;
+			n6->n3;
+			n7->n4;
+			
+		}label="LEGEND";
+		n5[color="black",fillcolor="#ff9900",fontcolor="#030303",label="ClusterRole",penwidth="1.0",shape="doubleoctagon",style="filled"];
+		n8[fillcolor="#ffcc00",fontcolor="#030303",label="ClusterRoleBinding",penwidth="1.0",shape="doubleoctagon",style="filled"];
+		n11[label="Cluster-scoped\laccess rules",shape="note"];
+		n5->n11;
+		n8->n5;
 		
 	}subgraph cluster_s5 {
 		ID = "cluster_s5";
-		label="kboom";
-		n18[fillcolor="#2f6de1",fontcolor="#f0f0f0",label="default",style="filled"];
-		n19[fillcolor="#2f6de1",fontcolor="#f0f0f0",label="kboom-sa",style="filled"];
+		label="cardassian";style="dashed";
+		n39[color="black",fillcolor="#2f6de1",fontcolor="#f0f0f0",label="default\n(ServiceAccount)",penwidth="1.0",shape="box",style="filled"];
 		
 	}subgraph cluster_s6 {
 		ID = "cluster_s6";
-		label="kube-public";
-		n22[fillcolor="#2f6de1",fontcolor="#f0f0f0",label="default",style="filled"];
+		label="cnat";style="dashed";
+		n40[color="black",fillcolor="#2f6de1",fontcolor="#f0f0f0",label="default\n(ServiceAccount)",penwidth="1.0",shape="box",style="filled"];
 		
-	}subgraph cluster_s0 {
-		ID = "cluster_s0";
-		label="kube-system";
-		n4[fillcolor="#2f6de1",fontcolor="#f0f0f0",label="aws-node",style="filled"];
-		n7[fillcolor="#2f6de1",fontcolor="#f0f0f0",label="coredns",style="filled"];
-		n8[fillcolor="#2f6de1",fontcolor="#f0f0f0",label="default",style="filled"];
-		n9[fillcolor="#2f6de1",fontcolor="#f0f0f0",label="kube-proxy",style="filled"];
+	}subgraph cluster_s7 {
+		ID = "cluster_s7";
+		label="default";style="dashed";
+		n41[color="black",fillcolor="#2f6de1",fontcolor="#f0f0f0",label="default\n(ServiceAccount)",penwidth="1.0",shape="box",style="filled"];
+		
+	}subgraph cluster_s2 {
+		ID = "cluster_s2";
+		label="kboom";style="dashed";
+		n42[color="black",fillcolor="#2f6de1",fontcolor="#f0f0f0",label="default\n(ServiceAccount)",penwidth="1.0",shape="box",style="filled"];
+		n24[color="black",fillcolor="#2f6de1",fontcolor="#f0f0f0",label="kboom-sa\n(ServiceAccount)",penwidth="1.0",shape="box",style="filled"];
+		
+	}subgraph cluster_s4 {
+		ID = "cluster_s4";
+		label="kube-public";style="dashed";
+		n35[color="black",fillcolor="#2f6de1",fontcolor="#f0f0f0",label="default\n(ServiceAccount)",penwidth="1.0",shape="box",style="filled"];
+		
+	}subgraph cluster_s3 {
+		ID = "cluster_s3";
+		label="kube-system";style="dashed";
+		n28[color="black",fillcolor="#2f6de1",fontcolor="#f0f0f0",label="aws-node\n(ServiceAccount)",penwidth="1.0",shape="box",style="filled"];
+		n36[color="black",fillcolor="#2f6de1",fontcolor="#f0f0f0",label="coredns\n(ServiceAccount)",penwidth="1.0",shape="box",style="filled"];
+		n37[color="black",fillcolor="#2f6de1",fontcolor="#f0f0f0",label="default\n(ServiceAccount)",penwidth="1.0",shape="box",style="filled"];
+		n32[color="black",fillcolor="#2f6de1",fontcolor="#f0f0f0",label="kube-proxy\n(ServiceAccount)",penwidth="1.0",shape="box",style="filled"];
+		n43[color="black",fillcolor="#ff9900",fontcolor="#030303",label="extension-apiserver-authentication-reader",penwidth="1.0",shape="octagon",style="filled"];
+		n44[label="get configmaps \"extension-apiserver-authentication\"\l",shape="note"];
+		n43->n44;
 		
 	}subgraph cluster_s1 {
 		ID = "cluster_s1";
-		label="rback";
-		n11[fillcolor="#2f6de1",fontcolor="#f0f0f0",label="default",style="filled"];
-		n12[fillcolor="#2f6de1",fontcolor="#f0f0f0",label="dummy",style="filled"];
-		n13[fillcolor="#ff9900",fontcolor="#030303",label="podreader",style="filled"];
-		n14[label="{\"apiGroups\":[\"\"],\"resources\":[\"pods\"],\"verbs\":[\"get\",\"list\"]}\n"];
+		label="rback";style="dashed";
+		n38[color="black",fillcolor="#2f6de1",fontcolor="#f0f0f0",label="default\n(ServiceAccount)",penwidth="1.0",shape="box",style="filled"];
+		n14[color="black",fillcolor="#2f6de1",fontcolor="#f0f0f0",label="dummy\n(ServiceAccount)",penwidth="1.0",shape="box",style="filled"];
+		n13[color="red",fillcolor="#ff9900",fontcolor="#030303",label="podreader",penwidth="2.0",shape="doubleoctagon",style="dotted"];
+		n45[color="black",fillcolor="#ff9900",fontcolor="#030303",label="podreader",penwidth="1.0",shape="octagon",style="filled"];
+		n12[fillcolor="#ffcc00",fontcolor="#030303",label="podreaderbinding",penwidth="1.0",shape="octagon",style="filled"];
+		n46[label="get,list pods\l",shape="note"];
+		n14->n12[dir="back"];
+		n45->n46;
 		n12->n13;
-		n13->n14;
 		
-	}
-	n2[fillcolor="#ff9900",fontcolor="#030303",label="(CLUSTER) ROLE",style="filled"];
-	n3[label="ACCESS RULES"];
-	n1[fillcolor="#2f6de1",fontcolor="#f0f0f0",label="SERVICE ACCOUNT",style="filled"];
-	n5[fillcolor="#ff9900",fontcolor="#030303",label="aws-node",style="filled"];
-	n20[fillcolor="#ff9900",fontcolor="#030303",label="cluster-admin",style="filled"];
-	n10[fillcolor="#ff9900",fontcolor="#030303",label="system:node-proxier",style="filled"];
-	n21[label="{\"apiGroups\":[\"*\"],\"resources\":[\"*\"],\"verbs\":[\"*\"]}\n{\"nonResourceURLs\":[\"*\"],\"verbs\":[\"*\"]}\n"];
-	n6[label="{\"apiGroups\":[\"crd.k8s.amazonaws.com\"],\"resources\":[\"*\",\"namespaces\"],\"verbs\":[\"*\"]}\n{\"apiGroups\":[\"\"],\"resources\":[\"pods\",\"nodes\",\"namespaces\"],\"verbs\":[\"list\",\"watch\",\"get\"]}\n{\"apiGroups\":[\"extensions\"],\"resources\":[\"daemonsets\"],\"verbs\":[\"list\",\"watch\"]}\n"];
-	n2->n3;
-	n1->n2;
-	n4->n5;
-	n5->n6;
-	n20->n21;
+	}newrank="true";
+	n34[color="black",fillcolor="#2f6de1",fontcolor="#f0f0f0",label="eks:kube-proxy-windows\n(Group)",penwidth="1.0",shape="box",style="filled"];
+	n51[color="black",fillcolor="#ff9900",fontcolor="#030303",label="admin",penwidth="1.0",shape="doubleoctagon",style="filled"];
+	n26[color="black",fillcolor="#ff9900",fontcolor="#030303",label="aws-node",penwidth="1.0",shape="doubleoctagon",style="filled"];
+	n22[color="black",fillcolor="#ff9900",fontcolor="#030303",label="cluster-admin",penwidth="1.0",shape="doubleoctagon",style="filled"];
+	n47[color="black",fillcolor="#ff9900",fontcolor="#030303",label="edit",penwidth="1.0",shape="doubleoctagon",style="filled"];
+	n16[color="black",fillcolor="#ff9900",fontcolor="#030303",label="eks:node-bootstrapper",penwidth="1.0",shape="doubleoctagon",style="filled"];
+	n19[color="black",fillcolor="#ff9900",fontcolor="#030303",label="eks:podsecuritypolicy:privileged",penwidth="1.0",shape="doubleoctagon",style="filled"];
+	n31[color="red",fillcolor="#ff9900",fontcolor="#030303",label="system:node-proxier",penwidth="2.0",shape="doubleoctagon",style="dotted"];
+	n49[color="black",fillcolor="#ff9900",fontcolor="#030303",label="view",penwidth="1.0",shape="doubleoctagon",style="filled"];
+	n25[fillcolor="#ffcc00",fontcolor="#030303",label="aws-node",penwidth="1.0",shape="doubleoctagon",style="filled"];
+	n29[fillcolor="#ffcc00",fontcolor="#030303",label="cluster-admin",penwidth="1.0",shape="doubleoctagon",style="filled"];
+	n30[fillcolor="#ffcc00",fontcolor="#030303",label="eks:kube-proxy",penwidth="1.0",shape="doubleoctagon",style="filled"];
+	n33[fillcolor="#ffcc00",fontcolor="#030303",label="eks:kube-proxy-windows",penwidth="1.0",shape="doubleoctagon",style="filled"];
+	n15[fillcolor="#ffcc00",fontcolor="#030303",label="eks:node-bootstrapper",penwidth="1.0",shape="doubleoctagon",style="filled"];
+	n18[fillcolor="#ffcc00",fontcolor="#030303",label="eks:podsecuritypolicy:authenticated",penwidth="1.0",shape="doubleoctagon",style="filled"];
+	n21[fillcolor="#ffcc00",fontcolor="#030303",label="kboom-crb",penwidth="1.0",shape="doubleoctagon",style="filled"];
+	n52[label="get,list,watch pods/attach,pods/exec,pods/portforward,pods/proxy,secrets,services/proxy\limpersonate serviceaccounts\lcreate,delete,deletecollection,patch,update pods,pods/attach,pods/exec,pods/portforward,pods/proxy\lcreate,delete,deletecollection,patch,update configmaps,endpoints,persistentvolumeclaims,replicationcontrollers,replicationcontrollers/scale,secrets,serviceaccounts,services,services/proxy\lcreate,delete,deletecollection,patch,update daemonsets,deployments,deployments/rollback,deployments/scale,replicasets,replicasets/scale,statefulsets,statefulsets/scale (apps)\lcreate,delete,deletecollection,patch,update horizontalpodautoscalers (autoscaling)\lcreate,delete,deletecollection,patch,update cronjobs,jobs (batch)\lcreate,delete,deletecollection,patch,update daemonsets,deployments,deployments/rollback,deployments/scale,ingresses,networkpolicies,replicasets,replicasets/scale,replicationcontrollers/scale (extensions)\lcreate,delete,deletecollection,patch,update poddisruptionbudgets (policy)\lcreate,delete,deletecollection,patch,update networkpolicies (networking.k8s.io)\lget,list,watch configmaps,endpoints,persistentvolumeclaims,pods,replicationcontrollers,replicationcontrollers/scale,serviceaccounts,services\lget,list,watch bindings,events,limitranges,namespaces/status,pods/log,pods/status,replicationcontrollers/status,resourcequotas,resourcequotas/status\lget,list,watch namespaces\lget,list,watch controllerrevisions,daemonsets,deployments,deployments/scale,replicasets,replicasets/scale,statefulsets,statefulsets/scale (apps)\lget,list,watch horizontalpodautoscalers (autoscaling)\lget,list,watch cronjobs,jobs (batch)\lget,list,watch daemonsets,deployments,deployments/scale,ingresses,networkpolicies,replicasets,replicasets/scale,replicationcontrollers/scale (extensions)\lget,list,watch poddisruptionbudgets (policy)\lget,list,watch networkpolicies (networking.k8s.io)\lcreate localsubjectaccessreviews (authorization.k8s.io)\lcreate,delete,deletecollection,get,list,patch,update,watch rolebindings,roles (rbac.authorization.k8s.io)\l",shape="note"];
+	n27[label="* *,namespaces (crd.k8s.amazonaws.com)\llist,watch,get pods,nodes,namespaces\llist,watch daemonsets (extensions)\l",shape="note"];
+	n23[label="* * (*)\l* *\l",shape="note"];
+	n48[label="get,list,watch pods/attach,pods/exec,pods/portforward,pods/proxy,secrets,services/proxy\limpersonate serviceaccounts\lcreate,delete,deletecollection,patch,update pods,pods/attach,pods/exec,pods/portforward,pods/proxy\lcreate,delete,deletecollection,patch,update configmaps,endpoints,persistentvolumeclaims,replicationcontrollers,replicationcontrollers/scale,secrets,serviceaccounts,services,services/proxy\lcreate,delete,deletecollection,patch,update daemonsets,deployments,deployments/rollback,deployments/scale,replicasets,replicasets/scale,statefulsets,statefulsets/scale (apps)\lcreate,delete,deletecollection,patch,update horizontalpodautoscalers (autoscaling)\lcreate,delete,deletecollection,patch,update cronjobs,jobs (batch)\lcreate,delete,deletecollection,patch,update daemonsets,deployments,deployments/rollback,deployments/scale,ingresses,networkpolicies,replicasets,replicasets/scale,replicationcontrollers/scale (extensions)\lcreate,delete,deletecollection,patch,update poddisruptionbudgets (policy)\lcreate,delete,deletecollection,patch,update networkpolicies (networking.k8s.io)\lget,list,watch configmaps,endpoints,persistentvolumeclaims,pods,replicationcontrollers,replicationcontrollers/scale,serviceaccounts,services\lget,list,watch bindings,events,limitranges,namespaces/status,pods/log,pods/status,replicationcontrollers/status,resourcequotas,resourcequotas/status\lget,list,watch namespaces\lget,list,watch controllerrevisions,daemonsets,deployments,deployments/scale,replicasets,replicasets/scale,statefulsets,statefulsets/scale (apps)\lget,list,watch horizontalpodautoscalers (autoscaling)\lget,list,watch cronjobs,jobs (batch)\lget,list,watch daemonsets,deployments,deployments/scale,ingresses,networkpolicies,replicasets,replicasets/scale,replicationcontrollers/scale (extensions)\lget,list,watch poddisruptionbudgets (policy)\lget,list,watch networkpolicies (networking.k8s.io)\l",shape="note"];
+	n17[label="create certificatesigningrequests/selfnodeserver (certificates.k8s.io)\l",shape="note"];
+	n20[label="use podsecuritypolicies \"eks.privileged\" (policy)\l",shape="note"];
+	n50[label="get,list,watch configmaps,endpoints,persistentvolumeclaims,pods,replicationcontrollers,replicationcontrollers/scale,serviceaccounts,services\lget,list,watch bindings,events,limitranges,namespaces/status,pods/log,pods/status,replicationcontrollers/status,resourcequotas,resourcequotas/status\lget,list,watch namespaces\lget,list,watch controllerrevisions,daemonsets,deployments,deployments/scale,replicasets,replicasets/scale,statefulsets,statefulsets/scale (apps)\lget,list,watch horizontalpodautoscalers (autoscaling)\lget,list,watch cronjobs,jobs (batch)\lget,list,watch daemonsets,deployments,deployments/scale,ingresses,networkpolicies,replicasets,replicasets/scale,replicationcontrollers/scale (extensions)\lget,list,watch poddisruptionbudgets (policy)\lget,list,watch networkpolicies (networking.k8s.io)\l",shape="note"];
+	n34->n33[dir="back"];
+	n1->n8[dir="back"];
+	n28->n25[dir="back"];
+	n24->n21[dir="back"];
+	n32->n30[dir="back"];
+	n51->n52;
+	n26->n27;
+	n22->n23;
+	n47->n48;
+	n16->n17;
 	n19->n20;
-	n9->n10;
+	n49->n50;
+	n25->n26;
+	n29->n22;
+	n30->n31;
+	n33->n31;
+	n15->n16;
+	n18->n19;
+	n21->n22;
+	{rank=same; n3;n4;n5;n13;n16;n19;n22;n26;n22;n31;n31;n43;n45;n47;n16;n19;n49;n51;n26;n22;};
 	
 }

@@ -398,22 +398,6 @@ func (r *Rback) genGraph() *dot.Graph {
 	g.Attr("newrank", "true") // global rank instead of per-subgraph (ensures access rules are always in the same place (at bottom))
 	r.renderLegend(g)
 
-	if r.config.resourceKind == "" || r.config.resourceKind == "serviceaccount" {
-		for _, ns := range r.determineNamespacesToShow(r.permissions) {
-			gns := r.newNamespaceSubgraph(g, ns)
-
-			for sa, _ := range r.permissions.ServiceAccounts[ns] {
-				renderSA := (r.config.resourceKind == "") ||
-					((r.allNamespaces() || contains(r.config.namespaces, ns)) &&
-						(r.allResourceNames() || contains(r.config.resourceNames, sa)))
-				if renderSA {
-					r.newSubjectNode(gns, "ServiceAccount", ns, sa)
-				}
-			}
-		}
-	}
-
-	// roles:
 	for _, roleBindings := range r.permissions.RoleBindings {
 		bindings, err := r.lookupBindings(roleBindings, "", "")
 		if err != nil {
@@ -453,6 +437,22 @@ func (r *Rback) genGraph() *dot.Graph {
 			}
 		}
 	}
+
+	if r.config.resourceKind == "" || r.config.resourceKind == "serviceaccount" {
+		for _, ns := range r.determineNamespacesToShow(r.permissions) {
+			gns := r.newNamespaceSubgraph(g, ns)
+
+			for sa, _ := range r.permissions.ServiceAccounts[ns] {
+				renderSA := (r.config.resourceKind == "") ||
+					((r.allNamespaces() || contains(r.config.namespaces, ns)) &&
+						(r.allResourceNames() || contains(r.config.resourceNames, sa)))
+				if renderSA {
+					r.newSubjectNode(gns, "ServiceAccount", ns, sa)
+				}
+			}
+		}
+	}
+
 	return g
 }
 

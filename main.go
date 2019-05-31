@@ -454,6 +454,30 @@ func (r *Rback) genGraph() *dot.Graph {
 		}
 	}
 
+	// draw any additional Roles that weren't referenced by bindings (and thus already drawn)
+	for ns, roles := range r.permissions.Roles {
+		var renderRoles bool
+
+		areClusterRoles := ns == ""
+		if areClusterRoles {
+			renderRoles = (r.config.resourceKind == "" || r.config.resourceKind == "clusterrole") && r.allNamespaces()
+		} else {
+			renderRoles = (r.config.resourceKind == "" || r.config.resourceKind == "role") && r.namespaceSelected(ns)
+		}
+
+		if !renderRoles {
+			continue
+		}
+
+		gns := r.newNamespaceSubgraph(g, ns)
+		for roleName, _ := range roles {
+			renderRole := r.namespaceSelected(ns) && r.resourceNameSelected(roleName)
+			if renderRole {
+				r.newRoleAndRulesNodePair(gns, "", NamespacedName{ns, roleName})
+			}
+		}
+	}
+
 	return g
 }
 

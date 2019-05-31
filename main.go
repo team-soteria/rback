@@ -211,36 +211,31 @@ func (r *Rback) getClusterScopedResources(kind string) (result map[string]string
 // fetchPermissions retrieves data about all access control related data
 // from service accounts to roles and bindings, both namespaced and the
 // cluster level.
-func (r *Rback) fetchPermissions() error {
-	sa, err := r.getServiceAccounts()
+func (r *Rback) fetchPermissions() (err error) {
+	r.permissions.ServiceAccounts, err = r.getServiceAccounts()
 	if err != nil {
 		return err
 	}
-	r.permissions.ServiceAccounts = sa
 
-	roles, err := r.getRoles()
+	r.permissions.Roles, err = r.getRoles()
 	if err != nil {
 		return err
 	}
-	r.permissions.Roles = roles
 
-	rb, err := r.getRoleBindings()
+	r.permissions.RoleBindings, err = r.getRoleBindings()
 	if err != nil {
 		return err
 	}
-	r.permissions.RoleBindings = rb
 
-	cr, err := r.getClusterRoles()
+	r.permissions.Roles[""], err = r.getClusterRoles()
 	if err != nil {
 		return err
 	}
-	r.permissions.Roles[""] = cr
 
-	crb, err := r.getClusterRoleBindings()
+	r.permissions.RoleBindings[""], err = r.getClusterRoleBindings()
 	if err != nil {
 		return err
 	}
-	r.permissions.RoleBindings[""] = crb
 	return nil
 }
 

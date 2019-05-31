@@ -422,8 +422,7 @@ func (r *Rback) genGraph() *dot.Graph {
 					continue
 				}
 				renderSubject := (r.config.resourceKind != "serviceaccount") ||
-					((r.allNamespaces() || contains(r.config.namespaces, subject.namespace)) &&
-						(r.allResourceNames() || contains(r.config.resourceNames, subject.name)))
+					(r.namespaceSelected(subject.namespace) && r.resourceNameSelected(subject.name))
 
 				if renderSubject {
 					gns := r.newNamespaceSubgraph(g, subject.namespace)
@@ -441,15 +440,13 @@ func (r *Rback) genGraph() *dot.Graph {
 	// draw any additional ServiceAccounts that weren't referenced by bindings (and thus drawn in the code above)
 	if r.config.resourceKind == "" || r.config.resourceKind == "serviceaccount" {
 		for ns, sas := range r.permissions.ServiceAccounts {
-			if !(r.allNamespaces() || contains(r.config.namespaces, ns)) {
+			if !r.namespaceSelected(ns) {
 				continue
 			}
 			gns := r.newNamespaceSubgraph(g, ns)
 
 			for sa, _ := range sas {
-				renderSA := (r.config.resourceKind == "") ||
-					((r.allNamespaces() || contains(r.config.namespaces, ns)) &&
-						(r.allResourceNames() || contains(r.config.resourceNames, sa)))
+				renderSA := r.config.resourceKind == "" || (r.namespaceSelected(ns) && r.resourceNameSelected(sa))
 				if renderSA {
 					r.newSubjectNode(gns, "ServiceAccount", ns, sa)
 				}
@@ -463,24 +460,24 @@ func (r *Rback) genGraph() *dot.Graph {
 func (r *Rback) shouldRenderBinding(binding Binding) bool {
 	switch r.config.resourceKind {
 	case "":
-		return r.allNamespaces() || contains(r.config.namespaces, binding.namespace)
+		return r.namespaceSelected(binding.namespace)
 	case "rolebinding":
-		return (r.allNamespaces() || contains(r.config.namespaces, binding.namespace)) && (r.allResourceNames() || contains(r.config.resourceNames, binding.name))
+		return r.namespaceSelected(binding.namespace) && r.resourceNameSelected(binding.name)
 	case "clusterrolebinding":
-		return binding.namespace == "" && (r.allResourceNames() || contains(r.config.resourceNames, binding.name))
+		return binding.namespace == "" && r.resourceNameSelected(binding.name)
 	case "serviceaccount":
 		for _, subject := range binding.subjects {
 			if subject.kind == "ServiceAccount" &&
-				(r.allNamespaces() || contains(r.config.namespaces, subject.namespace)) &&
-				(r.allResourceNames() || contains(r.config.resourceNames, subject.name)) &&
+				r.namespaceSelected(subject.namespace) &&
+				r.resourceNameSelected(subject.name) &&
 				r.subjectExists("ServiceAccount", subject.namespace, subject.name) {
 				return true
 			}
 		}
 	case "role":
-		return (r.allNamespaces() || contains(r.config.namespaces, binding.role.namespace)) && (r.allResourceNames() || contains(r.config.resourceNames, binding.role.name))
+		return r.namespaceSelected(binding.role.namespace) && r.resourceNameSelected(binding.role.name)
 	case "clusterrole":
-		return (binding.role.namespace == "" || r.allNamespaces() || contains(r.config.namespaces, binding.role.namespace)) && (r.allResourceNames() || contains(r.config.resourceNames, binding.role.name))
+		return (binding.role.namespace == "" || r.namespaceSelected(binding.role.namespace)) && r.resourceNameSelected(binding.role.name)
 	}
 	return false
 }
@@ -654,8 +651,16 @@ func (r *Rback) newClusterRoleNode(g *dot.Graph, bindingNamespace, roleName stri
 
 func (r *Rback) isFocused(kind string, ns string, name string) bool {
 	return r.config.resourceKind == kind &&
-		(r.allNamespaces() || contains(r.config.namespaces, ns)) &&
+		(r.namespaceSelected(ns)) &&
 		contains(r.config.resourceNames, name)
+}
+
+func (r *Rback) resourceNameSelected(name string) bool {
+	return r.allResourceNames() || contains(r.config.resourceNames, name)
+}
+
+func (r *Rback) namespaceSelected(ns string) bool {
+	return r.allNamespaces() || contains(r.config.namespaces, ns)
 }
 
 func (r *Rback) subjectExists(kind string, ns string, name string) bool {

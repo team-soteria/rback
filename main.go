@@ -26,11 +26,10 @@ type Config struct {
 }
 
 type Permissions struct {
-	ServiceAccounts     map[string]map[string]string // map[namespace]map[name]json
-	Roles               map[string]map[string]string
-	ClusterRoles        map[string]string
-	RoleBindings        map[string]map[string]string
-	ClusterRoleBindings map[string]string
+	ServiceAccounts map[string]map[string]string // map[namespace]map[name]json
+	Roles           map[string]map[string]string
+	ClusterRoles    map[string]string
+	RoleBindings    map[string]map[string]string // ClusterRoleBindings are stored in RoleBindings[""]
 }
 
 func main() {
@@ -242,7 +241,7 @@ func (r *Rback) fetchPermissions() error {
 	if err != nil {
 		return err
 	}
-	r.permissions.ClusterRoleBindings = crb
+	r.permissions.RoleBindings[""] = crb
 	return nil
 }
 
@@ -419,8 +418,6 @@ func (r *Rback) genGraph() *dot.Graph {
 			}
 		}
 	}
-
-	r.permissions.RoleBindings[""] = r.permissions.ClusterRoleBindings
 
 	// roles:
 	for _, roleBindings := range r.permissions.RoleBindings {

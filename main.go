@@ -659,7 +659,7 @@ func (r *Rback) newClusterRoleBindingNode(g *dot.Graph, name string, highlight b
 }
 
 func (r *Rback) newRoleNode(g *dot.Graph, namespace, name string, exists, highlight bool) dot.Node {
-	return g.Node("r-"+namespace+"/"+name).
+	node := g.Node("r-"+namespace+"/"+name).
 		Attr("label", name).
 		Attr("shape", "octagon").
 		Attr("style", iff(exists, "filled", "dotted")).
@@ -667,10 +667,12 @@ func (r *Rback) newRoleNode(g *dot.Graph, namespace, name string, exists, highli
 		Attr("penwidth", iff(highlight || !exists, "2.0", "1.0")).
 		Attr("fillcolor", "#ff9900").
 		Attr("fontcolor", "#030303")
+	g.Root().AddToSameRank("Roles", node)
+	return node
 }
 
 func (r *Rback) newClusterRoleNode(g *dot.Graph, bindingNamespace, roleName string, exists, highlight bool) dot.Node {
-	return g.Node("cr-"+bindingNamespace+"/"+roleName).
+	node := g.Node("cr-"+bindingNamespace+"/"+roleName).
 		Attr("label", roleName).
 		Attr("shape", "doubleoctagon").
 		Attr("style", iff(exists, iff(bindingNamespace == "", "filled", "filled,dashed"), "dotted")).
@@ -678,6 +680,8 @@ func (r *Rback) newClusterRoleNode(g *dot.Graph, bindingNamespace, roleName stri
 		Attr("penwidth", iff(highlight || !exists, "2.0", "1.0")).
 		Attr("fillcolor", "#ff9900").
 		Attr("fontcolor", "#030303")
+	g.Root().AddToSameRank("Roles", node)
+	return node
 }
 
 func (r *Rback) isFocused(kind string, ns string, name string) bool {

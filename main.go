@@ -445,7 +445,7 @@ func (r *Rback) genGraph() *dot.Graph {
 			gns := r.existingOrNewNamespaceSubgraph(g, binding.namespace)
 
 			bindingNode := r.newBindingNode(gns, binding)
-			roleNode := r.newRoleAndRulesNodePair(gns, binding.role)
+			roleNode := r.newRoleAndRulesNodePair(gns, binding.namespace, binding.role)
 
 			bindingNode.Edge(roleNode)
 
@@ -548,11 +548,11 @@ func (r *Rback) newBindingNode(gns *dot.Graph, binding Binding) dot.Node {
 	}
 }
 
-func (r *Rback) newRoleAndRulesNodePair(gns *dot.Graph, role NamespacedName) dot.Node {
+func (r *Rback) newRoleAndRulesNodePair(gns *dot.Graph, bindingNamespace string, role NamespacedName) dot.Node {
 	var roleNode dot.Node
 	isClusterRole := role.namespace == ""
 	if isClusterRole {
-		roleNode = r.newClusterRoleNode(gns, role.namespace, role.name, r.clusterRoleExists(role), r.isFocused("clusterrole", role.namespace, role.name))
+		roleNode = r.newClusterRoleNode(gns, bindingNamespace, role.name, r.clusterRoleExists(role), r.isFocused("clusterrole", role.namespace, role.name))
 	} else {
 		roleNode = r.newRoleNode(gns, role.namespace, role.name, r.roleExists(role), r.isFocused("role", role.namespace, role.name))
 	}
@@ -690,11 +690,11 @@ func (r *Rback) newRoleNode(g *dot.Graph, namespace, name string, exists, highli
 		Attr("fontcolor", "#030303")
 }
 
-func (r *Rback) newClusterRoleNode(g *dot.Graph, namespace, name string, exists, highlight bool) dot.Node {
-	return g.Node("cr-"+namespace+"/"+name).
-		Attr("label", name).
+func (r *Rback) newClusterRoleNode(g *dot.Graph, bindingNamespace, roleName string, exists, highlight bool) dot.Node {
+	return g.Node("cr-"+bindingNamespace+"/"+roleName).
+		Attr("label", roleName).
 		Attr("shape", "doubleoctagon").
-		Attr("style", iff(exists, iff(namespace == "", "filled", "filled,dashed"), "dotted")).
+		Attr("style", iff(exists, iff(bindingNamespace == "", "filled", "filled,dashed"), "dotted")).
 		Attr("color", iff(exists, "black", "red")).
 		Attr("penwidth", iff(highlight || !exists, "2.0", "1.0")).
 		Attr("fillcolor", "#ff9900").

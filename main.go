@@ -438,11 +438,15 @@ func (r *Rback) genGraph() *dot.Graph {
 		}
 	}
 
+	// draw any additional ServiceAccounts that weren't referenced by bindings (and thus drawn in the code above)
 	if r.config.resourceKind == "" || r.config.resourceKind == "serviceaccount" {
-		for _, ns := range r.determineNamespacesToShow(r.permissions) {
+		for ns, sas := range r.permissions.ServiceAccounts {
+			if !(r.allNamespaces() || contains(r.config.namespaces, ns)) {
+				continue
+			}
 			gns := r.newNamespaceSubgraph(g, ns)
 
-			for sa, _ := range r.permissions.ServiceAccounts[ns] {
+			for sa, _ := range sas {
 				renderSA := (r.config.resourceKind == "") ||
 					((r.allNamespaces() || contains(r.config.namespaces, ns)) &&
 						(r.allResourceNames() || contains(r.config.resourceNames, sa)))
@@ -496,30 +500,6 @@ func contains(values []string, value string) bool {
 		}
 	}
 	return false
-}
-
-func (r *Rback) determineNamespacesToShow(p Permissions) (namespaces []string) {
-	if r.allNamespaces() {
-		type void struct{}
-		var present void
-		namespaceSet := make(map[string]void)
-		for ns, _ := range p.ServiceAccounts {
-			namespaceSet[ns] = present
-		}
-		for ns, _ := range p.RoleBindings {
-			namespaceSet[ns] = present
-		}
-		for ns, _ := range p.Roles {
-			namespaceSet[ns] = present
-		}
-
-		for ns, _ := range namespaceSet {
-			namespaces = append(namespaces, ns)
-		}
-		return namespaces
-	} else {
-		return r.config.namespaces
-	}
 }
 
 func (r *Rback) newBindingNode(gns *dot.Graph, binding Binding) dot.Node {

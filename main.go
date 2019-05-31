@@ -447,7 +447,7 @@ func (r *Rback) genGraph() *dot.Graph {
 			bindingNode := r.newBindingNode(gns, binding)
 			roleNode := r.newRoleAndRulesNodePair(gns, binding.namespace, binding.role)
 
-			bindingNode.Edge(roleNode)
+			edge(bindingNode, roleNode)
 
 			saNodes := []dot.Node{}
 			for _, subject := range binding.subjects {
@@ -466,7 +466,7 @@ func (r *Rback) genGraph() *dot.Graph {
 			}
 
 			for _, saNode := range saNodes {
-				saNode.Edge(bindingNode).Attr("dir", "back")
+				edge(saNode, bindingNode).Attr("dir", "back")
 			}
 		}
 	}
@@ -564,7 +564,7 @@ func (r *Rback) newRoleAndRulesNodePair(gns *dot.Graph, bindingNamespace string,
 		}
 		if rules != "" {
 			rulesNode := newRulesNode(gns, role.namespace, role.name, rules)
-			gns.Edge(roleNode, rulesNode)
+			edge(roleNode, rulesNode)
 		}
 	}
 	return roleNode
@@ -607,29 +607,29 @@ func (r *Rback) renderLegend(g *dot.Graph) {
 	clusterrole := r.newClusterRoleNode(legend, "", "ClusterRole", true, false)
 
 	roleBinding := r.newRoleBindingNode(namespace, "RoleBinding", false)
-	sa.Edge(roleBinding).Attr("dir", "back")
-	missingSa.Edge(roleBinding).Attr("dir", "back")
-	roleBinding.Edge(role)
+	edge(sa, roleBinding).Attr("dir", "back")
+	edge(missingSa, roleBinding).Attr("dir", "back")
+	edge(roleBinding, role)
 
 	roleBinding2 := r.newRoleBindingNode(namespace, "RoleBinding-to-ClusterRole", false)
 	roleBinding2.Attr("label", "RoleBinding")
-	sa.Edge(roleBinding2).Attr("dir", "back")
-	roleBinding2.Edge(clusterRoleBoundLocally)
+	edge(sa, roleBinding2).Attr("dir", "back")
+	edge(roleBinding2, clusterRoleBoundLocally)
 
 	clusterRoleBinding := r.newClusterRoleBindingNode(legend, "ClusterRoleBinding", false)
-	sa.Edge(clusterRoleBinding).Attr("dir", "back")
-	clusterRoleBinding.Edge(clusterrole)
+	edge(sa, clusterRoleBinding).Attr("dir", "back")
+	edge(clusterRoleBinding, clusterrole)
 
 	if r.config.showRules {
 		nsrules := newRulesNode(namespace, "ns", "Role", "Namespace-scoped\naccess rules")
-		legend.Edge(role, nsrules)
+		edge(role, nsrules)
 
 		nsrules2 := newRulesNode(namespace, "ns", "ClusterRole", "Namespace-scoped access rules From ClusterRole")
 		nsrules2.Attr("label", "Namespace-scoped\naccess rules")
-		legend.Edge(clusterRoleBoundLocally, nsrules2)
+		edge(clusterRoleBoundLocally, nsrules2)
 
 		clusterrules := newRulesNode(legend, "", "ClusterRole", "Cluster-scoped\naccess rules")
-		legend.Edge(clusterrole, clusterrules)
+		edge(clusterrole, clusterrules)
 	}
 }
 
@@ -743,6 +743,16 @@ func newRulesNode(g *dot.Graph, namespace, roleName, rules string) dot.Node {
 	return g.Node("rules-"+namespace+"/"+roleName).
 		Attr("label", dot.Literal(`"`+rules+`"`)).
 		Attr("shape", "note")
+}
+
+// edge creates a new edge between two nodes, but only if the edge doesn't exist yet
+func edge(from dot.Node, to dot.Node) dot.Edge {
+	existingEdges := from.EdgesTo(to)
+	if len(existingEdges) == 0 {
+		return from.Edge(to)
+	} else {
+		return existingEdges[0]
+	}
 }
 
 func iff(condition bool, string1, string2 string) string {

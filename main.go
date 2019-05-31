@@ -14,9 +14,6 @@ import (
 type Rback struct {
 	config      Config
 	permissions Permissions
-
-	nsSubgraphs  map[string]*dot.Graph
-	subjectNodes map[KindNamespacedName]dot.Node
 }
 
 type Config struct {
@@ -408,21 +405,16 @@ func (r *Rback) genGraph() *dot.Graph {
 	g.Attr("newrank", "true") // global rank instead of per-subgraph (ensures access rules are always in the same place (at bottom))
 	r.renderLegend(g)
 
-	r.nsSubgraphs = make(map[string]*dot.Graph)
-	r.nsSubgraphs[""] = g
-
-	r.subjectNodes = make(map[KindNamespacedName]dot.Node)
-
 	if r.config.resourceKind == "" || r.config.resourceKind == "serviceaccount" {
 		for _, ns := range r.determineNamespacesToShow(r.permissions) {
-			gns := r.existingOrNewNamespaceSubgraph(g, ns)
+			gns := r.newNamespaceSubgraph(g, ns)
 
 			for sa, _ := range r.permissions.ServiceAccounts[ns] {
 				renderSA := (r.config.resourceKind == "") ||
 					((r.allNamespaces() || contains(r.config.namespaces, ns)) &&
 						(r.allResourceNames() || contains(r.config.resourceNames, sa)))
 				if renderSA {
-					r.existingOrNewSubjectNode(gns, "ServiceAccount", ns, sa)
+					r.newSubjectNode(gns, "ServiceAccount", ns, sa)
 				}
 			}
 		}
@@ -442,7 +434,7 @@ func (r *Rback) genGraph() *dot.Graph {
 				continue
 			}
 
-			gns := r.existingOrNewNamespaceSubgraph(g, binding.namespace)
+			gns := r.newNamespaceSubgraph(g, binding.namespace)
 
 			bindingNode := r.newBindingNode(gns, binding)
 			roleNode := r.newRoleAndRulesNodePair(gns, binding.namespace, binding.role)
@@ -459,8 +451,8 @@ func (r *Rback) genGraph() *dot.Graph {
 						(r.allResourceNames() || contains(r.config.resourceNames, subject.name)))
 
 				if renderSubject {
-					gns := r.existingOrNewNamespaceSubgraph(g, subject.namespace)
-					subjectNode := r.existingOrNewSubjectNode(gns, subject.kind, subject.namespace, subject.name)
+					gns := r.newNamespaceSubgraph(g, subject.namespace)
+					subjectNode := r.newSubjectNode(gns, subject.kind, subject.namespace, subject.name)
 					saNodes = append(saNodes, subjectNode)
 				}
 			}
@@ -570,25 +562,6 @@ func (r *Rback) newRoleAndRulesNodePair(gns *dot.Graph, bindingNamespace string,
 	return roleNode
 }
 
-func (r *Rback) existingOrNewSubjectNode(gns *dot.Graph, kind string, ns string, name string) dot.Node {
-	knn := KindNamespacedName{kind, NamespacedName{ns, name}}
-	node, found := r.subjectNodes[knn]
-	if !found {
-		node = r.newSubjectNode(gns, kind, name, r.subjectExists(kind, ns, name), r.isFocused(strings.ToLower(kind), ns, name))
-		r.subjectNodes[knn] = node
-	}
-	return node
-}
-
-func (r *Rback) existingOrNewNamespaceSubgraph(g *dot.Graph, ns string) *dot.Graph {
-	gns := r.nsSubgraphs[ns]
-	if gns == nil {
-		gns = r.newNamespaceSubgraph(g, ns)
-		r.nsSubgraphs[ns] = gns
-	}
-	return gns
-}
-
 func (r *Rback) renderLegend(g *dot.Graph) {
 	if !r.config.showLegend {
 		return
@@ -599,8 +572,8 @@ func (r *Rback) renderLegend(g *dot.Graph) {
 	namespace := legend.Subgraph("Namespace", dot.ClusterOption{})
 	namespace.Attr("style", "dashed")
 
-	sa := r.newSubjectNode(namespace, "Kind", "Subject", true, false)
-	missingSa := r.newSubjectNode(namespace, "Kind", "Missing Subject", false, false)
+	sa := r.newSubjectNode0(namespace, "Kind", "Subject", true, false)
+	missingSa := r.newSubjectNode0(namespace, "Kind", "Missing Subject", false, false)
 
 	role := r.newRoleNode(namespace, "ns", "Role", true, false)
 	clusterRoleBoundLocally := r.newClusterRoleNode(namespace, "ns", "ClusterRole", true, false) // bound by (namespaced!) RoleBinding
@@ -643,12 +616,19 @@ func struct2json(s map[string]interface{}) (string, error) {
 }
 
 func (r *Rback) newNamespaceSubgraph(g *dot.Graph, ns string) *dot.Graph {
+	if ns == "" {
+		return g
+	}
 	gns := g.Subgraph(ns, dot.ClusterOption{})
 	gns.Attr("style", "dashed")
 	return gns
 }
 
-func (r *Rback) newSubjectNode(g *dot.Graph, kind, name string, exists, highlight bool) dot.Node {
+func (r *Rback) newSubjectNode(gns *dot.Graph, kind string, ns string, name string) dot.Node {
+	return r.newSubjectNode0(gns, kind, name, r.subjectExists(kind, ns, name), r.isFocused(strings.ToLower(kind), ns, name))
+}
+
+func (r *Rback) newSubjectNode0(g *dot.Graph, kind, name string, exists, highlight bool) dot.Node {
 	return g.Node(kind+"-"+name).
 		Box().
 		Attr("label", fmt.Sprintf("%s\n(%s)", name, kind)).

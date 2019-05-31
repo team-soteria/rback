@@ -479,7 +479,8 @@ func (r *Rback) shouldRenderBinding(binding Binding) bool {
 			r.resourceNameSelected(binding.role.name) &&
 			r.roleExists(binding.role)
 	case "clusterrole":
-		return (binding.role.namespace == "" || r.namespaceSelected(binding.role.namespace)) &&
+		bindingPointsToClusterRole := binding.role.namespace == ""
+		return bindingPointsToClusterRole &&
 			r.resourceNameSelected(binding.role.name) &&
 			r.roleExists(binding.role)
 	}

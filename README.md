@@ -25,14 +25,14 @@ or locally (k3s, kind, Minikube, Docker for Desktop) as well as  `kubectl` insta
 To install it for macOS, do:
 
 ```sh
-$ curl -sL https://github.com/mhausenblas/rback/releases/download/v0.2.0/macos_rback -o rback
+$ curl -sL https://github.com/mhausenblas/rback/releases/download/v0.3.0/macos_rback -o rback
 $ chmod +x rback && sudo mv rback /usr/local/bin
 ```
 
 To install it for Linux, do:
 
 ```sh
-$ curl -sL https://github.com/mhausenblas/rback/releases/download/v0.2.0/linux_rback -o rback
+$ curl -sL https://github.com/mhausenblas/rback/releases/download/v0.3.0/linux_rback -o rback
 $ chmod +x rback && sudo mv rback /usr/local/bin
 ```
 

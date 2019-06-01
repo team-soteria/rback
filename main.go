@@ -23,11 +23,31 @@ type Config struct {
 	ignoredPrefixes []string
 	resourceKind    string
 	resourceNames   []string
+	whoCan          *WhoCan
+}
+
+type WhoCan struct {
+	verb, resourceKind, resourceName string
+}
+
+func (w *WhoCan) matchesAnyRuleIn(role Role) bool {
+	for _, rule := range role.rules {
+		if w.matches(rule) {
+			return true
+		}
+	}
+	return false
+}
+
+func (w *WhoCan) matches(rule Rule) bool {
+	return (contains(rule.verbs, "*") || contains(rule.verbs, w.verb)) &&
+		(contains(rule.resources, "*") || contains(rule.resources, w.resourceKind)) &&
+		(w.resourceName == "" || contains(rule.resourceNames, w.resourceName)) // TODO: also check API group!
 }
 
 type Permissions struct {
 	ServiceAccounts map[string]map[string]string // map[namespace]map[name]json
-	Roles           map[string]map[string]string // ClusterRoles are stored in Roles[""]
+	Roles           map[string]map[string]Role   // ClusterRoles are stored in Roles[""]
 	RoleBindings    map[string]map[string]string // ClusterRoleBindings are stored in RoleBindings[""]
 }
 
@@ -45,10 +65,25 @@ func main() {
 	flag.Parse()
 
 	if flag.NArg() > 0 {
-		config.resourceKind = normalizeKind(flag.Arg(0))
-	}
-	if flag.NArg() > 1 {
-		config.resourceNames = flag.Args()[1:]
+		if flag.Arg(0) == "who-can" {
+			if flag.NArg() < 3 {
+				fmt.Println("Usage: rback who-can VERB RESOURCE [NAME]")
+				os.Exit(-4)
+			}
+			config.resourceKind = "rule"
+			config.whoCan = &WhoCan{
+				verb:         flag.Arg(1),
+				resourceKind: flag.Arg(2),
+			}
+			if flag.NArg() > 3 {
+				config.whoCan.resourceName = flag.Arg(3)
+			}
+		} else {
+			config.resourceKind = normalizeKind(flag.Arg(0))
+			if flag.NArg() > 1 {
+				config.resourceNames = flag.Args()[1:]
+			}
+		}
 	}
 
 	config.namespaces = strings.Split(namespaces, ",")
@@ -100,29 +135,86 @@ func (r *Rback) shouldIgnore(name string) bool {
 }
 
 // getServiceAccounts retrieves data about service accounts across all namespaces
-func (r *Rback) getServiceAccounts() (result map[string]map[string]string, err error) {
-	return r.getNamespacedResources("sa", []string{""}, []string{})
+func (r *Rback) getServiceAccounts() (map[string]map[string]string, error) {
+	rawServiceAccounts, err := r.getNamespacedResources("sa", []string{""}, []string{})
+	if err != nil {
+		return nil, err
+	}
+
+	result := map[string]map[string]string{}
+	for ns, roleBindings := range rawServiceAccounts {
+		result[ns] = map[string]string{}
+		for name, role := range roleBindings {
+			json, _ := struct2json(role)
+			result[ns][name] = json
+		}
+	}
+	return result, err
 }
 
 func getNamespacedName(obj map[string]interface{}) NamespacedName {
 	metadata := obj["metadata"].(map[string]interface{})
-	ns := metadata["namespace"]
+	ns := ""
+	rawNs := metadata["namespace"]
+	if rawNs != nil {
+		ns = rawNs.(string)
+	}
+
 	name := metadata["name"]
-	return NamespacedName{ns.(string), name.(string)}
+	return NamespacedName{ns, name.(string)}
 }
 
 // getRoles retrieves data about roles across all namespaces
-func (r *Rback) getRoles() (result map[string]map[string]string, err error) {
-	return r.getNamespacedResources("roles", []string{""}, []string{})
+func (r *Rback) getRoles() (map[string]map[string]Role, error) {
+	rawRoles, err := r.getNamespacedResources("roles", []string{""}, []string{})
+	if err != nil {
+		return nil, err
+	}
+
+	result := map[string]map[string]Role{}
+	for ns, roles := range rawRoles {
+		result[ns] = map[string]Role{}
+		for name, role := range roles {
+			result[ns][name] = toRole(role)
+		}
+	}
+
+	return result, err
+}
+
+func toRole(rawRole map[string]interface{}) Role {
+	rules := []Rule{}
+	rawRules := rawRole["rules"].([]interface{})
+	for _, r := range rawRules {
+		rules = append(rules, toRule(r))
+	}
+
+	return Role{
+		getNamespacedName(rawRole),
+		rules,
+	}
 }
 
 // getRoleBindings retrieves data about roles across all namespaces
-func (r *Rback) getRoleBindings() (result map[string]map[string]string, err error) {
-	return r.getNamespacedResources("rolebindings", []string{""}, []string{})
+func (r *Rback) getRoleBindings() (map[string]map[string]string, error) {
+	rawRoleBindings, err := r.getNamespacedResources("rolebindings", []string{""}, []string{})
+	if err != nil {
+		return nil, err
+	}
+
+	result := map[string]map[string]string{}
+	for ns, roleBindings := range rawRoleBindings {
+		result[ns] = map[string]string{}
+		for name, role := range roleBindings {
+			json, _ := struct2json(role)
+			result[ns][name] = json
+		}
+	}
+	return result, err
 }
 
-func (r *Rback) getNamespacedResources(kind string, namespaces, names []string) (result map[string]map[string]string, err error) {
-	result = make(map[string]map[string]string)
+func (r *Rback) getNamespacedResources(kind string, namespaces, names []string) (result map[string]map[string]map[string]interface{}, err error) {
+	result = make(map[string]map[string]map[string]interface{})
 	for _, namespace := range namespaces {
 		var args []string
 		if namespace == "" {
@@ -149,42 +241,58 @@ func (r *Rback) getNamespacedResources(kind string, namespaces, names []string) 
 				item := i.(map[string]interface{})
 				nn := getNamespacedName(item)
 				if !r.shouldIgnore(nn.name) {
-					itemJson, _ := struct2json(item)
 					result[nn.namespace] = ensureMap(result[nn.namespace])
-					result[nn.namespace][nn.name] = itemJson
+					result[nn.namespace][nn.name] = item
 				}
 			}
 		} else {
 			nn := getNamespacedName(d)
-			itemJson, _ := struct2json(d)
 			result[nn.namespace] = ensureMap(result[nn.namespace])
-			result[nn.namespace][nn.name] = itemJson
+			result[nn.namespace][nn.name] = d
 		}
 	}
 	return result, nil
 }
 
 // ensureMap is similar to append(), but for maps - it creates a new map if necessary
-func ensureMap(m map[string]string) map[string]string {
+func ensureMap(m map[string]map[string]interface{}) map[string]map[string]interface{} {
 	if m != nil {
 		return m
 	}
-	return make(map[string]string)
+	return make(map[string]map[string]interface{})
 }
 
 // getClusterRoles retrieves data about cluster roles
-func (r *Rback) getClusterRoles() (result map[string]string, err error) {
-	return r.getClusterScopedResources("clusterroles")
+func (r *Rback) getClusterRoles() (map[string]Role, error) {
+	rawRoles, err := r.getClusterScopedResources("clusterroles")
+	if err != nil {
+		return nil, err
+	}
+
+	result := map[string]Role{}
+	for name, role := range rawRoles {
+		result[name] = toRole(role)
+	}
+	return result, err
 }
 
 // getClusterRoleBindings retrieves data about cluster role bindings
-func (r *Rback) getClusterRoleBindings() (result map[string]string, err error) {
-	return r.getClusterScopedResources("clusterrolebindings")
+func (r *Rback) getClusterRoleBindings() (map[string]string, error) {
+	rawRoleBindings, err := r.getClusterScopedResources("clusterrolebindings")
+	if err != nil {
+		return nil, err
+	}
 
+	result := map[string]string{}
+	for name, role := range rawRoleBindings {
+		json, _ := struct2json(role)
+		result[name] = json
+	}
+	return result, err
 }
 
-func (r *Rback) getClusterScopedResources(kind string) (result map[string]string, err error) {
-	result = map[string]string{}
+func (r *Rback) getClusterScopedResources(kind string) (result map[string]map[string]interface{}, err error) {
+	result = map[string]map[string]interface{}{}
 	res, err := kubecuddler.Kubectl(true, true, "", "get", kind, "--output", "json")
 	if err != nil {
 		return result, err
@@ -201,8 +309,7 @@ func (r *Rback) getClusterScopedResources(kind string) (result map[string]string
 		metadata := item["metadata"].(map[string]interface{})
 		name := metadata["name"].(string)
 		if !r.shouldIgnore(name) {
-			itemJson, _ := struct2json(item)
-			result[name] = itemJson
+			result[name] = item
 		}
 	}
 	return result, nil
@@ -243,6 +350,11 @@ type Binding struct {
 	NamespacedName
 	role     NamespacedName
 	subjects []KindNamespacedName
+}
+
+type Role struct {
+	NamespacedName
+	rules []Rule
 }
 
 type NamespacedName struct {
@@ -326,71 +438,51 @@ func stringOrEmpty(i interface{}) string {
 	return i.(string)
 }
 
-// lookupResources lists resources referenced in a role.
-// if namespace is empty then the scope is cluster-wide.
-func (r *Rback) lookupResources(namespace, role string) (rules string, err error) {
-	if namespace != "" { // look up in roles
-		rules, err = findAccessRules(r.permissions.Roles[namespace], role)
-		if err != nil {
-			return "", err
-		}
+func toRule(rule interface{}) Rule {
+	r := rule.(map[string]interface{})
+	return Rule{
+		verbs:           toStringArray(r["verbs"]),
+		resources:       toStringArray(r["resources"]),
+		resourceNames:   toStringArray(r["resourceNames"]),
+		nonResourceURLs: toStringArray(r["nonResourceURLs"]),
+		apiGroups:       toStringArray(r["apiGroups"]),
 	}
-	// ... otherwise, look up in cluster roles:
-	clusterRules, err := findAccessRules(r.permissions.Roles[""], role)
-	if err != nil {
-		return "", err
-	}
-	return clusterRules + rules, nil
 }
 
-func findAccessRules(roles map[string]string, roleName string) (resources string, err error) {
-	roleJson, found := roles[roleName]
-	if found {
-		var role map[string]interface{}
-		b := []byte(roleJson)
-		err = json.Unmarshal(b, &role)
-		if err != nil {
-			return "", err
-		}
-		rules := role["rules"].([]interface{})
-		for _, rule := range rules {
-			r := rule.(map[string]interface{})
-			resources += toHumanReadableRule(r) + "\n"
-		}
-	}
-	return resources, nil
+type Rule struct {
+	verbs           []string
+	resources       []string
+	resourceNames   []string
+	nonResourceURLs []string
+	apiGroups       []string
 }
 
-func toHumanReadableRule(rule map[string]interface{}) string {
-	line := toString(rule["verbs"])
-	resourceKinds := toString(rule["resources"])
-	if resourceKinds != "" {
-		line += fmt.Sprintf(` %v`, resourceKinds)
+func (r *Rule) toHumanReadableString() string {
+	result := strings.Join(r.verbs, ",")
+	if len(r.resources) > 0 {
+		result += fmt.Sprintf(` %v`, strings.Join(r.resources, ","))
 	}
-	resourceNames := toString(rule["resourceNames"])
-	if resourceNames != "" {
-		line += fmt.Sprintf(` "%v"`, resourceNames)
+	if len(r.resourceNames) > 0 {
+		result += fmt.Sprintf(` "%v"`, strings.Join(r.resourceNames, ","))
 	}
-	nonResourceURLs := toString(rule["nonResourceURLs"])
-	if nonResourceURLs != "" {
-		line += fmt.Sprintf(` %v`, nonResourceURLs)
+	if len(r.nonResourceURLs) > 0 {
+		result += fmt.Sprintf(` %v`, strings.Join(r.nonResourceURLs, ","))
 	}
-	apiGroups := toString(rule["apiGroups"])
-	if apiGroups != "" {
-		line += fmt.Sprintf(` (%v)`, apiGroups)
+	if len(r.apiGroups) > 1 || (len(r.apiGroups) == 1 && r.apiGroups[0] != "") {
+		result += fmt.Sprintf(` (%v)`, strings.Join(r.apiGroups, ","))
 	}
-	return line
+	return result
 }
 
-func toString(values interface{}) string {
+func toStringArray(values interface{}) []string {
 	if values == nil {
-		return ""
+		return []string{}
 	}
 	var strs []string
 	for _, v := range values.([]interface{}) {
 		strs = append(strs, v.(string))
 	}
-	return strings.Join(strs, ",")
+	return strs
 }
 
 func (r *Rback) genGraph() *dot.Graph {
@@ -509,6 +601,9 @@ func (r *Rback) shouldRenderBinding(binding Binding) bool {
 		return bindingPointsToClusterRole &&
 			r.resourceNameSelected(binding.role.name) &&
 			r.roleExists(binding.role)
+	case "rule":
+		bindingPointsToClusterRole := binding.role.namespace == ""
+		return r.ruleMatchesSelection(binding.role) && (bindingPointsToClusterRole || r.namespaceSelected(binding.role.namespace))
 	}
 	return false
 }
@@ -548,14 +643,9 @@ func (r *Rback) newRoleAndRulesNodePair(gns *dot.Graph, bindingNamespace string,
 		roleNode = r.newRoleNode(gns, role.namespace, role.name, r.roleExists(role), r.isFocused("role", role.namespace, role.name))
 	}
 	if r.config.showRules {
-		rules, err := r.lookupResources(role.namespace, role.name)
-		if err != nil {
-			fmt.Printf("Can't look up entities and resources due to: %v", err)
-			os.Exit(-3)
-		}
-		if rules != "" {
-			rulesNode := newRulesNode(gns, role.namespace, role.name, rules)
-			edge(roleNode, rulesNode)
+		rulesNode := r.newRulesNode(gns, role.namespace, role.name, r.isFocused("rule", role.namespace, role.name))
+		if rulesNode != nil {
+			edge(roleNode, *rulesNode)
 		}
 	}
 	return roleNode
@@ -593,14 +683,14 @@ func (r *Rback) renderLegend(g *dot.Graph) {
 	edge(clusterRoleBinding, clusterrole)
 
 	if r.config.showRules {
-		nsrules := newRulesNode(namespace, "ns", "Role", "Namespace-scoped\naccess rules")
+		nsrules := r.newRulesNode0(namespace, "ns", "Role", "Namespace-scoped\naccess rules", false)
 		edge(role, nsrules)
 
-		nsrules2 := newRulesNode(namespace, "ns", "ClusterRole", "Namespace-scoped access rules From ClusterRole")
+		nsrules2 := r.newRulesNode0(namespace, "ns", "ClusterRole", "Namespace-scoped access rules From ClusterRole", false)
 		nsrules2.Attr("label", "Namespace-scoped\naccess rules")
 		edge(clusterRoleBoundLocally, nsrules2)
 
-		clusterrules := newRulesNode(legend, "", "ClusterRole", "Cluster-scoped\naccess rules")
+		clusterrules := r.newRulesNode0(legend, "", "ClusterRole", "Cluster-scoped\naccess rules", false)
 		edge(clusterrole, clusterrules)
 	}
 }
@@ -685,7 +775,11 @@ func (r *Rback) newClusterRoleNode(g *dot.Graph, bindingNamespace, roleName stri
 }
 
 func (r *Rback) isFocused(kind string, ns string, name string) bool {
-	return r.config.resourceKind == kind && r.namespaceSelected(ns) && r.resourceNameSelected(name)
+	if kind == "rule" {
+		return r.ruleMatchesSelection(NamespacedName{ns, name})
+	} else {
+		return r.config.resourceKind == kind && r.namespaceSelected(ns) && r.resourceNameSelected(name)
+	}
 }
 
 func (r *Rback) resourceNameSelected(name string) bool {
@@ -718,13 +812,57 @@ func (r *Rback) roleExists(role NamespacedName) bool {
 	return false
 }
 
-func newRulesNode(g *dot.Graph, namespace, roleName, rules string) dot.Node {
-	rules = strings.ReplaceAll(rules, `\`, `\\`)
-	rules = strings.ReplaceAll(rules, "\n", `\l`) // left-justify text
-	rules = strings.ReplaceAll(rules, `"`, `\"`)  // using Literal, so we need to escape quotes
+func (r *Rback) ruleMatchesSelection(roleRef NamespacedName) bool {
+	if r.config.resourceKind == "rule" {
+		if roles, found := r.permissions.Roles[roleRef.namespace]; found {
+			if role, found := roles[roleRef.name]; found {
+				return r.config.whoCan.matchesAnyRuleIn(role)
+			}
+		}
+	}
+	return false
+}
+
+func (r *Rback) newRulesNode(g *dot.Graph, namespace, roleName string, highlight bool) *dot.Node {
+	var rules string
+	if roles, found := r.permissions.Roles[namespace]; found {
+		if role, found := roles[roleName]; found {
+			for _, rule := range role.rules {
+				ruleMatches := false
+				if r.config.resourceKind == "rule" {
+					ruleMatches = highlight && r.config.whoCan.matches(rule)
+					if ruleMatches {
+						rules += "<b>"
+					}
+				}
+				rules += escapeHTML(rule.toHumanReadableString())
+				if ruleMatches {
+					rules += "</b>"
+				}
+				rules += `<br align="left"/>`
+			}
+		}
+	}
+	if rules == "" {
+		return nil
+	} else {
+		node := r.newRulesNode0(g, namespace, roleName, rules, highlight)
+		return &node
+	}
+}
+
+func escapeHTML(str string) string {
+	str = strings.ReplaceAll(str, `<`, `&lt;`)
+	str = strings.ReplaceAll(str, `>`, `&gt;`)
+	str = strings.ReplaceAll(str, ` `, `&nbsp;`)
+	return str
+}
+
+func (r *Rback) newRulesNode0(g *dot.Graph, namespace, roleName, rulesHTML string, highlight bool) dot.Node {
 	return g.Node("rules-"+namespace+"/"+roleName).
-		Attr("label", dot.Literal(`"`+rules+`"`)).
-		Attr("shape", "note")
+		Attr("label", dot.HTML(rulesHTML)).
+		Attr("shape", "note").
+		Attr("penwidth", iff(highlight, "2.0", "1.0"))
 }
 
 // edge creates a new edge between two nodes, but only if the edge doesn't exist yet

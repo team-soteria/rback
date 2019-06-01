@@ -23,11 +23,12 @@ type Config struct {
 	ignoredPrefixes []string
 	resourceKind    string
 	resourceNames   []string
-	whoCan          *WhoCan
+	whoCan          WhoCan
 }
 
 type WhoCan struct {
 	verb, resourceKind, resourceName string
+	showMatchedOnly                  bool
 }
 
 func (w *WhoCan) matchesAnyRuleIn(role Role) bool {
@@ -56,6 +57,7 @@ func main() {
 	config := Config{}
 	flag.BoolVar(&config.showLegend, "show-legend", true, "Whether to show the legend or not")
 	flag.BoolVar(&config.showRules, "show-rules", true, "Whether to render RBAC access rules (e.g. \"get pods\") or not")
+	flag.BoolVar(&config.whoCan.showMatchedOnly, "show-matched-rules-only", false, "When running who-can, only show the matched rule instead of all rules specified in the role")
 
 	var namespaces string
 	flag.StringVar(&namespaces, "n", "", "The namespace to render (also supports multiple, comma-delimited namespaces)")
@@ -71,10 +73,8 @@ func main() {
 				os.Exit(-4)
 			}
 			config.resourceKind = "rule"
-			config.whoCan = &WhoCan{
-				verb:         flag.Arg(1),
-				resourceKind: flag.Arg(2),
-			}
+			config.whoCan.verb = flag.Arg(1)
+			config.whoCan.resourceKind = flag.Arg(2)
 			if flag.NArg() > 3 {
 				config.whoCan.resourceName = flag.Arg(3)
 			}
@@ -828,18 +828,18 @@ func (r *Rback) newRulesNode(g *dot.Graph, namespace, roleName string, highlight
 	if roles, found := r.permissions.Roles[namespace]; found {
 		if role, found := roles[roleName]; found {
 			for _, rule := range role.rules {
-				ruleMatches := false
-				if r.config.resourceKind == "rule" {
-					ruleMatches = highlight && r.config.whoCan.matches(rule)
-					if ruleMatches {
-						rules += "<b>"
+				ruleMatches := r.config.resourceKind == "rule" && highlight && r.config.whoCan.matches(rule)
+				if ruleMatches {
+					rules += "<b>" + escapeHTML(rule.toHumanReadableString()) + "</b>" + `<br align="left"/>`
+				} else {
+					if r.config.whoCan.showMatchedOnly {
+						if !strings.HasSuffix(rules, `...<br align="left"/>`) {
+							rules += `...<br align="left"/>`
+						}
+					} else {
+						rules += escapeHTML(rule.toHumanReadableString()) + `<br align="left"/>`
 					}
 				}
-				rules += escapeHTML(rule.toHumanReadableString())
-				if ruleMatches {
-					rules += "</b>"
-				}
-				rules += `<br align="left"/>`
 			}
 		}
 	}

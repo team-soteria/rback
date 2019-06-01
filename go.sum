@@ -1,4 +1,2 @@
 github.com/emicklei/dot v0.10.0 h1:BAuTQEJM56bu8Z0+d073CPJrc9I8gj4uXCKDIO0Cwpk=
 github.com/emicklei/dot v0.10.0/go.mod h1:kZg82Ikwc4pqb31Ct2yb0B7RUqxh3JESIXw2uWSv/xY=
-github.com/mhausenblas/kubecuddler v0.0.0-20181012110128-5836f3e4e7d0 h1:TZSzAlXKCKnstV6euLVFkwI4gHudDPoLqq3/kBaR3PI=
-github.com/mhausenblas/kubecuddler v0.0.0-20181012110128-5836f3e4e7d0/go.mod h1:6FIXVGLaL5pg6GSkmkDEY1TaRCNySC7DdR+/PF0OClo=

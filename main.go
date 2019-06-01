@@ -4,11 +4,12 @@ import (
 	"encoding/json"
 	"flag"
 	"fmt"
+	"io"
+	"log"
 	"os"
 	"strings"
 
 	"github.com/emicklei/dot"
-	"github.com/mhausenblas/kubecuddler"
 )
 
 type Rback struct {
@@ -94,9 +95,9 @@ func main() {
 
 	rback := Rback{config: config}
 
-	err := rback.fetchPermissions()
+	err := rback.parseRBAC(os.Stdin)
 	if err != nil {
-		fmt.Printf("Can't query permissions due to :%v", err)
+		fmt.Fprintf(os.Stderr, "Can't parse RBAC resources from stdin: %v\n", err)
 		os.Exit(-1)
 	}
 	g := rback.genGraph()
@@ -134,24 +135,6 @@ func (r *Rback) shouldIgnore(name string) bool {
 	return false
 }
 
-// getServiceAccounts retrieves data about service accounts across all namespaces
-func (r *Rback) getServiceAccounts() (map[string]map[string]string, error) {
-	rawServiceAccounts, err := r.getNamespacedResources("sa", []string{""}, []string{})
-	if err != nil {
-		return nil, err
-	}
-
-	result := map[string]map[string]string{}
-	for ns, roleBindings := range rawServiceAccounts {
-		result[ns] = map[string]string{}
-		for name, role := range roleBindings {
-			json, _ := struct2json(role)
-			result[ns][name] = json
-		}
-	}
-	return result, err
-}
-
 func getNamespacedName(obj map[string]interface{}) NamespacedName {
 	metadata := obj["metadata"].(map[string]interface{})
 	ns := ""
@@ -162,24 +145,6 @@ func getNamespacedName(obj map[string]interface{}) NamespacedName {
 
 	name := metadata["name"]
 	return NamespacedName{ns, name.(string)}
-}
-
-// getRoles retrieves data about roles across all namespaces
-func (r *Rback) getRoles() (map[string]map[string]Role, error) {
-	rawRoles, err := r.getNamespacedResources("roles", []string{""}, []string{})
-	if err != nil {
-		return nil, err
-	}
-
-	result := map[string]map[string]Role{}
-	for ns, roles := range rawRoles {
-		result[ns] = map[string]Role{}
-		for name, role := range roles {
-			result[ns][name] = toRole(role)
-		}
-	}
-
-	return result, err
 }
 
 func toRole(rawRole map[string]interface{}) Role {
@@ -195,153 +160,56 @@ func toRole(rawRole map[string]interface{}) Role {
 	}
 }
 
-// getRoleBindings retrieves data about roles across all namespaces
-func (r *Rback) getRoleBindings() (map[string]map[string]string, error) {
-	rawRoleBindings, err := r.getNamespacedResources("rolebindings", []string{""}, []string{})
+// parseRBAC parses RBAC resources from the given reader and stores them in maps under r.permissions
+func (r *Rback) parseRBAC(reader io.Reader) (err error) {
+	var input map[string]interface{}
+
+	decoder := json.NewDecoder(reader)
+	err = decoder.Decode(&input)
 	if err != nil {
-		return nil, err
+		return err
 	}
 
-	result := map[string]map[string]string{}
-	for ns, roleBindings := range rawRoleBindings {
-		result[ns] = map[string]string{}
-		for name, role := range roleBindings {
-			json, _ := struct2json(role)
-			result[ns][name] = json
-		}
-	}
-	return result, err
-}
-
-func (r *Rback) getNamespacedResources(kind string, namespaces, names []string) (result map[string]map[string]map[string]interface{}, err error) {
-	result = make(map[string]map[string]map[string]interface{})
-	for _, namespace := range namespaces {
-		var args []string
-		if namespace == "" {
-			args = []string{kind, "--all-namespaces", "--output", "json"}
-		} else if len(names) == 0 {
-			args = []string{kind, "-n", namespace, "--output", "json"}
-		} else {
-			args = append([]string{kind, "-n", namespace, "--output", "json"}, names...)
-		}
-		res, err := kubecuddler.Kubectl(true, true, "", "get", args...)
-		if err != nil {
-			return result, err
-		}
-		var d map[string]interface{}
-		b := []byte(res)
-		err = json.Unmarshal(b, &d)
-		if err != nil {
-			return result, err
-		}
-
-		if d["kind"] == "List" {
-			items := d["items"].([]interface{})
-			for _, i := range items {
-				item := i.(map[string]interface{})
-				nn := getNamespacedName(item)
-				if !r.shouldIgnore(nn.name) {
-					result[nn.namespace] = ensureMap(result[nn.namespace])
-					result[nn.namespace][nn.name] = item
-				}
-			}
-		} else {
-			nn := getNamespacedName(d)
-			result[nn.namespace] = ensureMap(result[nn.namespace])
-			result[nn.namespace][nn.name] = d
-		}
-	}
-	return result, nil
-}
-
-// ensureMap is similar to append(), but for maps - it creates a new map if necessary
-func ensureMap(m map[string]map[string]interface{}) map[string]map[string]interface{} {
-	if m != nil {
-		return m
-	}
-	return make(map[string]map[string]interface{})
-}
-
-// getClusterRoles retrieves data about cluster roles
-func (r *Rback) getClusterRoles() (map[string]Role, error) {
-	rawRoles, err := r.getClusterScopedResources("clusterroles")
-	if err != nil {
-		return nil, err
+	if input["kind"] != "List" {
+		return fmt.Errorf("Expected kind=List, but found %v", input["kind"])
 	}
 
-	result := map[string]Role{}
-	for name, role := range rawRoles {
-		result[name] = toRole(role)
-	}
-	return result, err
-}
+	r.permissions.ServiceAccounts = make(map[string]map[string]string)
+	r.permissions.Roles = make(map[string]map[string]Role)
+	r.permissions.RoleBindings = make(map[string]map[string]string)
 
-// getClusterRoleBindings retrieves data about cluster role bindings
-func (r *Rback) getClusterRoleBindings() (map[string]string, error) {
-	rawRoleBindings, err := r.getClusterScopedResources("clusterrolebindings")
-	if err != nil {
-		return nil, err
-	}
-
-	result := map[string]string{}
-	for name, role := range rawRoleBindings {
-		json, _ := struct2json(role)
-		result[name] = json
-	}
-	return result, err
-}
-
-func (r *Rback) getClusterScopedResources(kind string) (result map[string]map[string]interface{}, err error) {
-	result = map[string]map[string]interface{}{}
-	res, err := kubecuddler.Kubectl(true, true, "", "get", kind, "--output", "json")
-	if err != nil {
-		return result, err
-	}
-	var d map[string]interface{}
-	b := []byte(res)
-	err = json.Unmarshal(b, &d)
-	if err != nil {
-		return result, err
-	}
-	items := d["items"].([]interface{})
+	items := input["items"].([]interface{})
 	for _, i := range items {
 		item := i.(map[string]interface{})
-		metadata := item["metadata"].(map[string]interface{})
-		name := metadata["name"].(string)
-		if !r.shouldIgnore(name) {
-			result[name] = item
+		nn := getNamespacedName(item)
+
+		if r.shouldIgnore(nn.name) {
+			continue
 		}
-	}
-	return result, nil
-}
 
-// fetchPermissions retrieves data about all access control related data
-// from service accounts to roles and bindings, both namespaced and the
-// cluster level.
-func (r *Rback) fetchPermissions() (err error) {
-	r.permissions.ServiceAccounts, err = r.getServiceAccounts()
-	if err != nil {
-		return err
-	}
+		kind := item["kind"].(string)
 
-	r.permissions.Roles, err = r.getRoles()
-	if err != nil {
-		return err
-	}
-
-	r.permissions.RoleBindings, err = r.getRoleBindings()
-	if err != nil {
-		return err
-	}
-
-	r.permissions.Roles[""], err = r.getClusterRoles()
-	if err != nil {
-		return err
-	}
-
-	r.permissions.RoleBindings[""], err = r.getClusterRoleBindings()
-	if err != nil {
-		return err
+		switch kind {
+		case "ServiceAccount":
+			if r.permissions.ServiceAccounts[nn.namespace] == nil {
+				r.permissions.ServiceAccounts[nn.namespace] = make(map[string]string)
+			}
+			json, _ := struct2json(item)
+			r.permissions.ServiceAccounts[nn.namespace][nn.name] = json
+		case "RoleBinding", "ClusterRoleBinding":
+			if r.permissions.RoleBindings[nn.namespace] == nil {
+				r.permissions.RoleBindings[nn.namespace] = make(map[string]string)
+			}
+			json, _ := struct2json(item)
+			r.permissions.RoleBindings[nn.namespace][nn.name] = json
+		case "Role", "ClusterRole":
+			if r.permissions.Roles[nn.namespace] == nil {
+				r.permissions.Roles[nn.namespace] = make(map[string]Role)
+			}
+			r.permissions.Roles[nn.namespace][nn.name] = toRole(item)
+		default:
+			log.Printf("Ignoring resource kind %s", kind)
+		}
 	}
 	return nil
 }

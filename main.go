@@ -151,16 +151,16 @@ func (r *Rback) shouldIgnore(name string) bool {
 	return false
 }
 
-func getNamespacedName(obj map[string]interface{}) NamespacedName {
-	metadata := obj["metadata"].(map[string]interface{})
-	ns := ""
-	rawNs := metadata["namespace"]
-	if rawNs != nil {
-		ns = rawNs.(string)
+func getNamespacedName(metadataOrRef map[string]interface{}) NamespacedName {
+	return NamespacedName{
+		stringOrEmpty(metadataOrRef["namespace"]),
+		metadataOrRef["name"].(string),
 	}
+}
 
-	name := metadata["name"]
-	return NamespacedName{ns, name.(string)}
+func getMetadata(obj map[string]interface{}) map[string]interface{} {
+	metadata := obj["metadata"].(map[string]interface{})
+	return metadata
 }
 
 func toRole(rawRole map[string]interface{}) Role {
@@ -171,7 +171,7 @@ func toRole(rawRole map[string]interface{}) Role {
 	}
 
 	return Role{
-		getNamespacedName(rawRole),
+		getNamespacedName(getMetadata(rawRole)),
 		rules,
 	}
 }
@@ -197,7 +197,7 @@ func (r *Rback) parseRBAC(reader io.Reader) (err error) {
 	items := input["items"].([]interface{})
 	for _, i := range items {
 		item := i.(map[string]interface{})
-		nn := getNamespacedName(item)
+		nn := getNamespacedName(getMetadata(item))
 
 		if r.shouldIgnore(nn.name) {
 			continue
@@ -251,30 +251,26 @@ type KindNamespacedName struct {
 }
 
 func toBinding(rawBinding map[string]interface{}) Binding {
-	nn := getNamespacedName(rawBinding)
+	nn := getNamespacedName(getMetadata(rawBinding))
 
 	roleRef := rawBinding["roleRef"].(map[string]interface{})
-	roleName := roleRef["name"].(string)
-	roleNs := stringOrEmpty(roleRef["namespace"])
+	roleNn := getNamespacedName(roleRef)
 
 	subs := []KindNamespacedName{}
 	if rawBinding["subjects"] != nil {
 		subjects := rawBinding["subjects"].([]interface{})
 
-		for _, subject := range subjects {
-			s := subject.(map[string]interface{})
+		for _, s := range subjects {
+			subject := s.(map[string]interface{})
 			subs = append(subs, KindNamespacedName{
-				kind: s["kind"].(string),
-				NamespacedName: NamespacedName{
-					namespace: stringOrEmpty(s["namespace"]),
-					name:      s["name"].(string),
-				},
+				kind:           subject["kind"].(string),
+				NamespacedName: getNamespacedName(subject),
 			})
 		}
 	}
 	return Binding{
 		NamespacedName: nn,
-		role:           NamespacedName{roleNs, roleName},
+		role:           roleNn,
 		subjects:       subs,
 	}
 }

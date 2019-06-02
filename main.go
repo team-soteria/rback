@@ -75,7 +75,7 @@ func main() {
 				fmt.Println("Usage: rback who-can VERB RESOURCE [NAME]")
 				os.Exit(-4)
 			}
-			config.resourceKind = "rule"
+			config.resourceKind = kindRule
 			config.whoCan.verb = flag.Arg(1)
 			config.whoCan.resourceKind = flag.Arg(2)
 			if flag.NArg() > 3 {
@@ -116,21 +116,32 @@ func main() {
 	fmt.Println(g.String())
 }
 
+const (
+	kindServiceAccount     = "serviceaccount"
+	kindRoleBinding        = "rolebinding"
+	kindClusterRoleBinding = "clusterrolebinding"
+	kindRole               = "role"
+	kindClusterRole        = "clusterrole"
+	kindUser               = "user"
+	kindGroup              = "group"
+	kindRule               = "rule" // internal kind used for nodes that list access rules defined in a role
+)
+
 var kindMap = map[string]string{
-	"sa":                  "serviceaccount",
-	"serviceaccounts":     "serviceaccount",
-	"rb":                  "rolebinding",
-	"rolebindings":        "rolebinding",
-	"crb":                 "clusterrolebinding",
-	"clusterrolebindings": "clusterrolebinding",
-	"r":                   "role",
-	"roles":               "role",
-	"cr":                  "clusterrole",
-	"clusterroles":        "clusterrole",
-	"u":                   "user",
-	"users":               "user",
-	"g":                   "group",
-	"groups":              "group",
+	"sa":                  kindServiceAccount,
+	"serviceaccounts":     kindServiceAccount,
+	"rb":                  kindRoleBinding,
+	"rolebindings":        kindRoleBinding,
+	"crb":                 kindClusterRoleBinding,
+	"clusterrolebindings": kindClusterRoleBinding,
+	"r":                   kindRole,
+	"roles":               kindRole,
+	"cr":                  kindClusterRole,
+	"clusterroles":        kindClusterRole,
+	"u":                   kindUser,
+	"users":               kindUser,
+	"g":                   kindGroup,
+	"groups":              kindGroup,
 }
 
 func normalizeKind(kind string) string {
@@ -350,7 +361,7 @@ func (r *Rback) genGraph() *dot.Graph {
 				if r.shouldIgnore(subject.name) {
 					continue
 				}
-				renderSubject := (r.config.resourceKind != "serviceaccount") ||
+				renderSubject := (r.config.resourceKind != kindServiceAccount) ||
 					(r.namespaceSelected(subject.namespace) && r.resourceNameSelected(subject.name))
 
 				if renderSubject {
@@ -367,7 +378,7 @@ func (r *Rback) genGraph() *dot.Graph {
 	}
 
 	// draw any additional ServiceAccounts that weren't referenced by bindings (and thus drawn in the code above)
-	if r.config.resourceKind == "" || r.config.resourceKind == "serviceaccount" {
+	if r.config.resourceKind == "" || r.config.resourceKind == kindServiceAccount {
 		for ns, sas := range r.permissions.ServiceAccounts {
 			if !r.namespaceSelected(ns) {
 				continue
@@ -389,9 +400,9 @@ func (r *Rback) genGraph() *dot.Graph {
 
 		areClusterRoles := ns == ""
 		if areClusterRoles {
-			renderRoles = (r.config.resourceKind == "" || r.config.resourceKind == "clusterrole") && r.allNamespaces()
+			renderRoles = (r.config.resourceKind == "" || r.config.resourceKind == kindClusterRole) && r.allNamespaces()
 		} else {
-			renderRoles = (r.config.resourceKind == "" || r.config.resourceKind == "role") && r.namespaceSelected(ns)
+			renderRoles = (r.config.resourceKind == "" || r.config.resourceKind == kindRole) && r.namespaceSelected(ns)
 		}
 
 		if !renderRoles {
@@ -414,11 +425,11 @@ func (r *Rback) shouldRenderBinding(binding Binding) bool {
 	switch r.config.resourceKind {
 	case "":
 		return r.namespaceSelected(binding.namespace)
-	case "rolebinding":
+	case kindRoleBinding:
 		return r.namespaceSelected(binding.namespace) && r.resourceNameSelected(binding.name)
-	case "clusterrolebinding":
+	case kindClusterRoleBinding:
 		return binding.namespace == "" && r.resourceNameSelected(binding.name)
-	case "serviceaccount":
+	case kindServiceAccount:
 		for _, subject := range binding.subjects {
 			if subject.kind == "ServiceAccount" &&
 				r.namespaceSelected(subject.namespace) &&
@@ -427,30 +438,30 @@ func (r *Rback) shouldRenderBinding(binding Binding) bool {
 				return true
 			}
 		}
-	case "user":
+	case kindUser:
 		for _, subject := range binding.subjects {
 			if subject.kind == "User" && r.resourceNameSelected(subject.name) {
 				return true
 			}
 		}
-	case "group":
+	case kindGroup:
 		for _, subject := range binding.subjects {
 			if subject.kind == "Group" && r.resourceNameSelected(subject.name) {
 				return true
 			}
 		}
-	case "role":
+	case kindRole:
 		bindingPointsToClusterRole := binding.role.namespace == ""
 		return !bindingPointsToClusterRole &&
 			r.namespaceSelected(binding.role.namespace) &&
 			r.resourceNameSelected(binding.role.name) &&
 			r.roleExists(binding.role)
-	case "clusterrole":
+	case kindClusterRole:
 		bindingPointsToClusterRole := binding.role.namespace == ""
 		return bindingPointsToClusterRole &&
 			r.resourceNameSelected(binding.role.name) &&
 			r.roleExists(binding.role)
-	case "rule":
+	case kindRule:
 		bindingPointsToClusterRole := binding.role.namespace == ""
 		return r.ruleMatchesSelection(binding.role) && (bindingPointsToClusterRole || r.namespaceSelected(binding.role.namespace))
 	}
@@ -476,21 +487,21 @@ func contains(values []string, value string) bool {
 
 func (r *Rback) newBindingNode(gns *dot.Graph, binding Binding) dot.Node {
 	if binding.namespace == "" {
-		return r.newClusterRoleBindingNode(gns, binding.name, r.isFocused("clusterrolebinding", "", binding.name))
+		return r.newClusterRoleBindingNode(gns, binding.name, r.isFocused(kindClusterRoleBinding, "", binding.name))
 	} else {
-		return r.newRoleBindingNode(gns, binding.name, r.isFocused("rolebinding", binding.namespace, binding.name))
+		return r.newRoleBindingNode(gns, binding.name, r.isFocused(kindRoleBinding, binding.namespace, binding.name))
 	}
 }
 
 func (r *Rback) newRoleAndRulesNodePair(gns *dot.Graph, bindingNamespace string, role NamespacedName) dot.Node {
 	var roleNode dot.Node
 	if role.namespace == "" {
-		roleNode = r.newClusterRoleNode(gns, bindingNamespace, role.name, r.roleExists(role), r.isFocused("clusterrole", role.namespace, role.name))
+		roleNode = r.newClusterRoleNode(gns, bindingNamespace, role.name, r.roleExists(role), r.isFocused(kindClusterRole, role.namespace, role.name))
 	} else {
-		roleNode = r.newRoleNode(gns, role.namespace, role.name, r.roleExists(role), r.isFocused("role", role.namespace, role.name))
+		roleNode = r.newRoleNode(gns, role.namespace, role.name, r.roleExists(role), r.isFocused(kindRole, role.namespace, role.name))
 	}
 	if r.config.showRules {
-		rulesNode := r.newRulesNode(gns, role.namespace, role.name, r.isFocused("rule", role.namespace, role.name))
+		rulesNode := r.newRulesNode(gns, role.namespace, role.name, r.isFocused(kindRule, role.namespace, role.name))
 		if rulesNode != nil {
 			edge(roleNode, *rulesNode)
 		}
@@ -630,7 +641,7 @@ func formatLabel(label string, highlight bool) interface{} {
 }
 
 func (r *Rback) isFocused(kind string, ns string, name string) bool {
-	if kind == "rule" {
+	if kind == kindRule {
 		return r.ruleMatchesSelection(NamespacedName{ns, name})
 	} else {
 		return r.config.resourceKind == kind && r.namespaceSelected(ns) && r.resourceNameSelected(name)
@@ -646,7 +657,7 @@ func (r *Rback) namespaceSelected(ns string) bool {
 }
 
 func (r *Rback) subjectExists(kind string, ns string, name string) bool {
-	if strings.ToLower(kind) != "serviceaccount" {
+	if strings.ToLower(kind) != kindServiceAccount {
 		return true // assume users and groups exist
 	}
 
@@ -668,7 +679,7 @@ func (r *Rback) roleExists(role NamespacedName) bool {
 }
 
 func (r *Rback) ruleMatchesSelection(roleRef NamespacedName) bool {
-	if r.config.resourceKind == "rule" {
+	if r.config.resourceKind == kindRule {
 		if roles, found := r.permissions.Roles[roleRef.namespace]; found {
 			if role, found := roles[roleRef.name]; found {
 				return r.config.whoCan.matchesAnyRuleIn(role)
@@ -683,7 +694,7 @@ func (r *Rback) newRulesNode(g *dot.Graph, namespace, roleName string, highlight
 	if roles, found := r.permissions.Roles[namespace]; found {
 		if role, found := roles[roleName]; found {
 			for _, rule := range role.rules {
-				ruleMatches := r.config.resourceKind == "rule" && highlight && r.config.whoCan.matches(rule)
+				ruleMatches := r.config.resourceKind == kindRule && highlight && r.config.whoCan.matches(rule)
 				if ruleMatches {
 					rules += "<b>" + escapeHTML(rule.toHumanReadableString()) + "</b>" + `<br align="left"/>`
 				} else {

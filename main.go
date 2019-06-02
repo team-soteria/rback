@@ -127,6 +127,10 @@ var kindMap = map[string]string{
 	"roles":               "role",
 	"cr":                  "clusterrole",
 	"clusterroles":        "clusterrole",
+	"u":                   "user",
+	"users":               "user",
+	"g":                   "group",
+	"groups":              "group",
 }
 
 func normalizeKind(kind string) string {
@@ -467,6 +471,18 @@ func (r *Rback) shouldRenderBinding(binding Binding) bool {
 				r.namespaceSelected(subject.namespace) &&
 				r.resourceNameSelected(subject.name) &&
 				r.subjectExists("ServiceAccount", subject.namespace, subject.name) {
+				return true
+			}
+		}
+	case "user":
+		for _, subject := range binding.subjects {
+			if subject.kind == "User" && r.resourceNameSelected(subject.name) {
+				return true
+			}
+		}
+	case "group":
+		for _, subject := range binding.subjects {
+			if subject.kind == "Group" && r.resourceNameSelected(subject.name) {
 				return true
 			}
 		}

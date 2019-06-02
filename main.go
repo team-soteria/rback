@@ -252,7 +252,7 @@ type KindNamespacedName struct {
 }
 
 // lookupBindings lists bindings & roles for a given service account
-func (r *Rback) lookupBindings(bindings map[string]string, saName, saNamespace string) (results []Binding, err error) {
+func (r *Rback) lookupBindings(bindings map[string]string) (results []Binding, err error) {
 	for _, rb := range bindings {
 		var binding map[string]interface{}
 		b := []byte(rb)
@@ -261,55 +261,32 @@ func (r *Rback) lookupBindings(bindings map[string]string, saName, saNamespace s
 			return results, err
 		}
 
-		metadata := binding["metadata"].(map[string]interface{})
-		bindingName := metadata["name"].(string)
-		bindingNs := ""
-		if metadata["namespace"] != nil {
-			bindingNs = metadata["namespace"].(string)
-		}
+		nn := getNamespacedName(binding)
 
 		roleRef := binding["roleRef"].(map[string]interface{})
 		roleName := roleRef["name"].(string)
-		roleNs := ""
-		if roleRef["namespace"] != nil {
-			roleNs = roleRef["namespace"].(string)
-		}
+		roleNs := stringOrEmpty(roleRef["namespace"])
 
 		if binding["subjects"] != nil {
 			subjects := binding["subjects"].([]interface{})
 
-			includeBinding := false
-			if saName == "" {
-				includeBinding = true
-			} else {
-				for _, subject := range subjects {
-					s := subject.(map[string]interface{})
-					if s["name"] == saName && s["namespace"] == saNamespace {
-						includeBinding = true
-						break
-					}
-				}
-			}
-
-			if includeBinding {
-				subs := []KindNamespacedName{}
-				for _, subject := range subjects {
-					s := subject.(map[string]interface{})
-					subs = append(subs, KindNamespacedName{
-						kind: s["kind"].(string),
-						NamespacedName: NamespacedName{
-							namespace: stringOrEmpty(s["namespace"]),
-							name:      s["name"].(string),
-						},
-					})
-				}
-
-				results = append(results, Binding{
-					NamespacedName: NamespacedName{bindingNs, bindingName},
-					role:           NamespacedName{roleNs, roleName},
-					subjects:       subs,
+			subs := []KindNamespacedName{}
+			for _, subject := range subjects {
+				s := subject.(map[string]interface{})
+				subs = append(subs, KindNamespacedName{
+					kind: s["kind"].(string),
+					NamespacedName: NamespacedName{
+						namespace: stringOrEmpty(s["namespace"]),
+						name:      s["name"].(string),
+					},
 				})
 			}
+
+			results = append(results, Binding{
+				NamespacedName: nn,
+				role:           NamespacedName{roleNs, roleName},
+				subjects:       subs,
+			})
 		}
 	}
 	return results, nil
@@ -375,7 +352,7 @@ func (r *Rback) genGraph() *dot.Graph {
 	r.renderLegend(g)
 
 	for _, roleBindings := range r.permissions.RoleBindings {
-		bindings, err := r.lookupBindings(roleBindings, "", "")
+		bindings, err := r.lookupBindings(roleBindings)
 		if err != nil {
 			fmt.Printf("Can't look up roles due to: %v", err)
 			os.Exit(-2)

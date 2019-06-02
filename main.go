@@ -18,6 +18,7 @@ type Rback struct {
 }
 
 type Config struct {
+	inputFile       string
 	showRules       bool
 	showLegend      bool
 	namespaces      []string
@@ -56,6 +57,7 @@ type Permissions struct {
 func main() {
 
 	config := Config{}
+	flag.StringVar(&config.inputFile, "f", "", "The name of the file to use as input (otherwise stdin is used)")
 	flag.BoolVar(&config.showLegend, "show-legend", true, "Whether to show the legend or not")
 	flag.BoolVar(&config.showRules, "show-rules", true, "Whether to render RBAC access rules (e.g. \"get pods\") or not")
 	flag.BoolVar(&config.whoCan.showMatchedOnly, "show-matched-rules-only", false, "When running who-can, only show the matched rule instead of all rules specified in the role")
@@ -95,7 +97,17 @@ func main() {
 
 	rback := Rback{config: config}
 
-	err := rback.parseRBAC(os.Stdin)
+	var err error
+	reader := os.Stdin
+	if config.inputFile != "" {
+		reader, err = os.Open(config.inputFile)
+		if err != nil {
+			fmt.Fprintf(os.Stderr, "Can't open file %s: %v\n", config.inputFile, err)
+			os.Exit(-1)
+		}
+	}
+
+	err = rback.parseRBAC(reader)
 	if err != nil {
 		fmt.Fprintf(os.Stderr, "Can't parse RBAC resources from stdin: %v\n", err)
 		os.Exit(-1)

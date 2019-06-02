@@ -49,9 +49,9 @@ func (w *WhoCan) matches(rule Rule) bool {
 }
 
 type Permissions struct {
-	ServiceAccounts map[string]map[string]string // map[namespace]map[name]json
-	Roles           map[string]map[string]Role   // ClusterRoles are stored in Roles[""]
-	RoleBindings    map[string]map[string]string // ClusterRoleBindings are stored in RoleBindings[""]
+	ServiceAccounts map[string]map[string]string  // map[namespace]map[name]json
+	Roles           map[string]map[string]Role    // ClusterRoles are stored in Roles[""]
+	RoleBindings    map[string]map[string]Binding // ClusterRoleBindings are stored in RoleBindings[""]
 }
 
 func main() {
@@ -192,7 +192,7 @@ func (r *Rback) parseRBAC(reader io.Reader) (err error) {
 
 	r.permissions.ServiceAccounts = make(map[string]map[string]string)
 	r.permissions.Roles = make(map[string]map[string]Role)
-	r.permissions.RoleBindings = make(map[string]map[string]string)
+	r.permissions.RoleBindings = make(map[string]map[string]Binding)
 
 	items := input["items"].([]interface{})
 	for _, i := range items {
@@ -214,10 +214,9 @@ func (r *Rback) parseRBAC(reader io.Reader) (err error) {
 			r.permissions.ServiceAccounts[nn.namespace][nn.name] = json
 		case "RoleBinding", "ClusterRoleBinding":
 			if r.permissions.RoleBindings[nn.namespace] == nil {
-				r.permissions.RoleBindings[nn.namespace] = make(map[string]string)
+				r.permissions.RoleBindings[nn.namespace] = make(map[string]Binding)
 			}
-			json, _ := struct2json(item)
-			r.permissions.RoleBindings[nn.namespace][nn.name] = json
+			r.permissions.RoleBindings[nn.namespace][nn.name] = toBinding(item)
 		case "Role", "ClusterRole":
 			if r.permissions.Roles[nn.namespace] == nil {
 				r.permissions.Roles[nn.namespace] = make(map[string]Role)
@@ -251,45 +250,33 @@ type KindNamespacedName struct {
 	NamespacedName
 }
 
-// lookupBindings lists bindings & roles for a given service account
-func (r *Rback) lookupBindings(bindings map[string]string) (results []Binding, err error) {
-	for _, rb := range bindings {
-		var binding map[string]interface{}
-		b := []byte(rb)
-		err = json.Unmarshal(b, &binding)
-		if err != nil {
-			return results, err
-		}
+func toBinding(rawBinding map[string]interface{}) Binding {
+	nn := getNamespacedName(rawBinding)
 
-		nn := getNamespacedName(binding)
+	roleRef := rawBinding["roleRef"].(map[string]interface{})
+	roleName := roleRef["name"].(string)
+	roleNs := stringOrEmpty(roleRef["namespace"])
 
-		roleRef := binding["roleRef"].(map[string]interface{})
-		roleName := roleRef["name"].(string)
-		roleNs := stringOrEmpty(roleRef["namespace"])
+	subs := []KindNamespacedName{}
+	if rawBinding["subjects"] != nil {
+		subjects := rawBinding["subjects"].([]interface{})
 
-		if binding["subjects"] != nil {
-			subjects := binding["subjects"].([]interface{})
-
-			subs := []KindNamespacedName{}
-			for _, subject := range subjects {
-				s := subject.(map[string]interface{})
-				subs = append(subs, KindNamespacedName{
-					kind: s["kind"].(string),
-					NamespacedName: NamespacedName{
-						namespace: stringOrEmpty(s["namespace"]),
-						name:      s["name"].(string),
-					},
-				})
-			}
-
-			results = append(results, Binding{
-				NamespacedName: nn,
-				role:           NamespacedName{roleNs, roleName},
-				subjects:       subs,
+		for _, subject := range subjects {
+			s := subject.(map[string]interface{})
+			subs = append(subs, KindNamespacedName{
+				kind: s["kind"].(string),
+				NamespacedName: NamespacedName{
+					namespace: stringOrEmpty(s["namespace"]),
+					name:      s["name"].(string),
+				},
 			})
 		}
 	}
-	return results, nil
+	return Binding{
+		NamespacedName: nn,
+		role:           NamespacedName{roleNs, roleName},
+		subjects:       subs,
+	}
 }
 
 func stringOrEmpty(i interface{}) string {
@@ -351,12 +338,7 @@ func (r *Rback) genGraph() *dot.Graph {
 	g.Attr("newrank", "true") // global rank instead of per-subgraph (ensures access rules are always in the same place (at bottom))
 	r.renderLegend(g)
 
-	for _, roleBindings := range r.permissions.RoleBindings {
-		bindings, err := r.lookupBindings(roleBindings)
-		if err != nil {
-			fmt.Printf("Can't look up roles due to: %v", err)
-			os.Exit(-2)
-		}
+	for _, bindings := range r.permissions.RoleBindings {
 		for _, binding := range bindings {
 			if !r.shouldRenderBinding(binding) {
 				continue

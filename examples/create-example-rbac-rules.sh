@@ -5,9 +5,11 @@ kubectl delete ns namespace2
 kubectl delete clusterrole my-clusterrole
 kubectl delete clusterrole my-clusterrole2
 kubectl delete clusterrole orphaned-clusterrole
+kubectl delete clusterrole psp-clusterrole
 kubectl delete clusterrolebinding my-clusterrole-binding
 kubectl delete clusterrolebinding my-clusterrole-binding2
 kubectl delete clusterrolebinding my-clusterrole-binding3
+kubectl delete clusterrolebinding psp-clusterrole-binding
 
 kubectl create ns namespace1
 kubectl create ns namespace2
@@ -20,8 +22,10 @@ kubectl -n namespace2 create serviceaccount my-service-account2
 
 kubectl create clusterrole my-clusterrole --verb=get --resource=services
 kubectl create clusterrole my-clusterrole2 --verb=get --resource=endpoints
+kubectl create clusterrole psp-clusterrole --verb=use --resource=podsecuritypolicies --resource-name=privileged
 kubectl create clusterrole orphaned-clusterrole --verb=create,get,update --resource=secrets
 kubectl create clusterrolebinding my-clusterrole-binding --clusterrole my-clusterrole --serviceaccount namespace1:my-service-account2
+kubectl create clusterrolebinding psp-clusterrole-binding --clusterrole psp-clusterrole --serviceaccount namespace1:my-service-account
 kubectl create clusterrolebinding my-clusterrole-binding2 --clusterrole my-clusterrole2 --user user2 --group group2
 kubectl create clusterrolebinding my-clusterrole-binding3 --clusterrole missing-clusterrole --serviceaccount namespace1:missing-service-account
 

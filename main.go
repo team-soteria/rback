@@ -251,27 +251,25 @@ type KindNamespacedName struct {
 }
 
 func toBinding(rawBinding map[string]interface{}) Binding {
-	nn := getNamespacedName(getMetadata(rawBinding))
-
-	roleRef := rawBinding["roleRef"].(map[string]interface{})
-	roleNn := getNamespacedName(roleRef)
-
-	subs := []KindNamespacedName{}
+	subjects := []KindNamespacedName{}
 	if rawBinding["subjects"] != nil {
-		subjects := rawBinding["subjects"].([]interface{})
-
-		for _, s := range subjects {
-			subject := s.(map[string]interface{})
-			subs = append(subs, KindNamespacedName{
-				kind:           subject["kind"].(string),
-				NamespacedName: getNamespacedName(subject),
-			})
+		rawSubjects := rawBinding["subjects"].([]interface{})
+		for _, s := range rawSubjects {
+			subjects = append(subjects, toKindNamespacedName(s))
 		}
 	}
 	return Binding{
-		NamespacedName: nn,
-		role:           roleNn,
-		subjects:       subs,
+		NamespacedName: getNamespacedName(getMetadata(rawBinding)),
+		role:           getNamespacedName(rawBinding["roleRef"].(map[string]interface{})),
+		subjects:       subjects,
+	}
+}
+
+func toKindNamespacedName(obj interface{}) KindNamespacedName {
+	o := obj.(map[string]interface{})
+	return KindNamespacedName{
+		kind:           o["kind"].(string),
+		NamespacedName: getNamespacedName(o),
 	}
 }
 

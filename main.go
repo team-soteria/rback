@@ -475,8 +475,7 @@ func contains(values []string, value string) bool {
 }
 
 func (r *Rback) newBindingNode(gns *dot.Graph, binding Binding) dot.Node {
-	isClusterRoleBinding := binding.namespace == ""
-	if isClusterRoleBinding {
+	if binding.namespace == "" {
 		return r.newClusterRoleBindingNode(gns, binding.name, r.isFocused("clusterrolebinding", "", binding.name))
 	} else {
 		return r.newRoleBindingNode(gns, binding.name, r.isFocused("rolebinding", binding.namespace, binding.name))
@@ -485,8 +484,7 @@ func (r *Rback) newBindingNode(gns *dot.Graph, binding Binding) dot.Node {
 
 func (r *Rback) newRoleAndRulesNodePair(gns *dot.Graph, bindingNamespace string, role NamespacedName) dot.Node {
 	var roleNode dot.Node
-	isClusterRole := role.namespace == ""
-	if isClusterRole {
+	if role.namespace == "" {
 		roleNode = r.newClusterRoleNode(gns, bindingNamespace, role.name, r.roleExists(role), r.isFocused("clusterrole", role.namespace, role.name))
 	} else {
 		roleNode = r.newRoleNode(gns, role.namespace, role.name, r.roleExists(role), r.isFocused("role", role.namespace, role.name))

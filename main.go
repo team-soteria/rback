@@ -45,7 +45,7 @@ func (w *WhoCan) matchesAnyRuleIn(role Role) bool {
 func (w *WhoCan) matches(rule Rule) bool {
 	return (contains(rule.verbs, "*") || contains(rule.verbs, w.verb)) &&
 		(contains(rule.resources, "*") || contains(rule.resources, w.resourceKind)) &&
-		(w.resourceName == "" || contains(rule.resourceNames, w.resourceName)) // TODO: also check API group!
+		(w.resourceName == "" || len(rule.resourceNames) == 0 || contains(rule.resourceNames, w.resourceName)) // TODO: also check API group!
 }
 
 type Permissions struct {

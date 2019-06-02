@@ -339,8 +339,7 @@ func toStringArray(values interface{}) []string {
 }
 
 func (r *Rback) genGraph() *dot.Graph {
-	g := dot.NewGraph(dot.Directed)
-	g.Attr("newrank", "true") // global rank instead of per-subgraph (ensures access rules are always in the same place (at bottom))
+	g := newGraph()
 	r.renderLegend(g)
 
 	for _, bindings := range r.permissions.RoleBindings {
@@ -349,12 +348,12 @@ func (r *Rback) genGraph() *dot.Graph {
 				continue
 			}
 
-			gns := r.newNamespaceSubgraph(g, binding.namespace)
+			gns := newNamespaceSubgraph(g, binding.namespace)
 
 			bindingNode := r.newBindingNode(gns, binding)
 			roleNode := r.newRoleAndRulesNodePair(gns, binding.namespace, binding.role)
 
-			edge(bindingNode, roleNode)
+			newBindingToRoleEdge(bindingNode, roleNode)
 
 			saNodes := []dot.Node{}
 			for _, subject := range binding.subjects {
@@ -365,14 +364,14 @@ func (r *Rback) genGraph() *dot.Graph {
 					(r.namespaceSelected(subject.namespace) && r.resourceNameSelected(subject.name))
 
 				if renderSubject {
-					gns := r.newNamespaceSubgraph(g, subject.namespace)
+					gns := newNamespaceSubgraph(g, subject.namespace)
 					subjectNode := r.newSubjectNode(gns, subject.kind, subject.namespace, subject.name)
 					saNodes = append(saNodes, subjectNode)
 				}
 			}
 
 			for _, saNode := range saNodes {
-				edge(saNode, bindingNode).Attr("dir", "back")
+				newSubjectToBindingEdge(saNode, bindingNode)
 			}
 		}
 	}
@@ -383,7 +382,7 @@ func (r *Rback) genGraph() *dot.Graph {
 			if !r.namespaceSelected(ns) {
 				continue
 			}
-			gns := r.newNamespaceSubgraph(g, ns)
+			gns := newNamespaceSubgraph(g, ns)
 
 			for sa, _ := range sas {
 				renderSA := r.config.resourceKind == "" || (r.namespaceSelected(ns) && r.resourceNameSelected(sa))
@@ -409,7 +408,7 @@ func (r *Rback) genGraph() *dot.Graph {
 			continue
 		}
 
-		gns := r.newNamespaceSubgraph(g, ns)
+		gns := newNamespaceSubgraph(g, ns)
 		for roleName, _ := range roles {
 			renderRole := r.namespaceSelected(ns) && r.resourceNameSelected(roleName)
 			if renderRole {
@@ -487,23 +486,23 @@ func contains(values []string, value string) bool {
 
 func (r *Rback) newBindingNode(gns *dot.Graph, binding Binding) dot.Node {
 	if binding.namespace == "" {
-		return r.newClusterRoleBindingNode(gns, binding.name, r.isFocused(kindClusterRoleBinding, "", binding.name))
+		return newClusterRoleBindingNode(gns, binding.name, r.isFocused(kindClusterRoleBinding, "", binding.name))
 	} else {
-		return r.newRoleBindingNode(gns, binding.name, r.isFocused(kindRoleBinding, binding.namespace, binding.name))
+		return newRoleBindingNode(gns, binding.name, r.isFocused(kindRoleBinding, binding.namespace, binding.name))
 	}
 }
 
 func (r *Rback) newRoleAndRulesNodePair(gns *dot.Graph, bindingNamespace string, role NamespacedName) dot.Node {
 	var roleNode dot.Node
 	if role.namespace == "" {
-		roleNode = r.newClusterRoleNode(gns, bindingNamespace, role.name, r.roleExists(role), r.isFocused(kindClusterRole, role.namespace, role.name))
+		roleNode = newClusterRoleNode(gns, bindingNamespace, role.name, r.roleExists(role), r.isFocused(kindClusterRole, role.namespace, role.name))
 	} else {
-		roleNode = r.newRoleNode(gns, role.namespace, role.name, r.roleExists(role), r.isFocused(kindRole, role.namespace, role.name))
+		roleNode = newRoleNode(gns, role.namespace, role.name, r.roleExists(role), r.isFocused(kindRole, role.namespace, role.name))
 	}
 	if r.config.showRules {
 		rulesNode := r.newRulesNode(gns, role.namespace, role.name, r.isFocused(kindRule, role.namespace, role.name))
 		if rulesNode != nil {
-			edge(roleNode, *rulesNode)
+			newRoleToRulesEdge(roleNode, *rulesNode)
 		}
 	}
 	return roleNode
@@ -516,40 +515,39 @@ func (r *Rback) renderLegend(g *dot.Graph) {
 
 	legend := g.Subgraph("LEGEND", dot.ClusterOption{})
 
-	namespace := legend.Subgraph("Namespace", dot.ClusterOption{})
-	namespace.Attr("style", "dashed")
+	namespace := newNamespaceSubgraph(legend, "Namespace")
 
-	sa := r.newSubjectNode0(namespace, "Kind", "Subject", true, false)
-	missingSa := r.newSubjectNode0(namespace, "Kind", "Missing Subject", false, false)
+	sa := newSubjectNode0(namespace, "Kind", "Subject", true, false)
+	missingSa := newSubjectNode0(namespace, "Kind", "Missing Subject", false, false)
 
-	role := r.newRoleNode(namespace, "ns", "Role", true, false)
-	clusterRoleBoundLocally := r.newClusterRoleNode(namespace, "ns", "ClusterRole", true, false) // bound by (namespaced!) RoleBinding
-	clusterrole := r.newClusterRoleNode(legend, "", "ClusterRole", true, false)
+	role := newRoleNode(namespace, "ns", "Role", true, false)
+	clusterRoleBoundLocally := newClusterRoleNode(namespace, "ns", "ClusterRole", true, false) // bound by (namespaced!) RoleBinding
+	clusterrole := newClusterRoleNode(legend, "", "ClusterRole", true, false)
 
-	roleBinding := r.newRoleBindingNode(namespace, "RoleBinding", false)
-	edge(sa, roleBinding).Attr("dir", "back")
-	edge(missingSa, roleBinding).Attr("dir", "back")
-	edge(roleBinding, role)
+	roleBinding := newRoleBindingNode(namespace, "RoleBinding", false)
+	newSubjectToBindingEdge(sa, roleBinding)
+	newSubjectToBindingEdge(missingSa, roleBinding)
+	newBindingToRoleEdge(roleBinding, role)
 
-	roleBinding2 := r.newRoleBindingNode(namespace, "RoleBinding-to-ClusterRole", false)
+	roleBinding2 := newRoleBindingNode(namespace, "RoleBinding-to-ClusterRole", false)
 	roleBinding2.Attr("label", "RoleBinding")
-	edge(sa, roleBinding2).Attr("dir", "back")
-	edge(roleBinding2, clusterRoleBoundLocally)
+	newSubjectToBindingEdge(sa, roleBinding2)
+	newBindingToRoleEdge(roleBinding2, clusterRoleBoundLocally)
 
-	clusterRoleBinding := r.newClusterRoleBindingNode(legend, "ClusterRoleBinding", false)
-	edge(sa, clusterRoleBinding).Attr("dir", "back")
-	edge(clusterRoleBinding, clusterrole)
+	clusterRoleBinding := newClusterRoleBindingNode(legend, "ClusterRoleBinding", false)
+	newSubjectToBindingEdge(sa, clusterRoleBinding)
+	newBindingToRoleEdge(clusterRoleBinding, clusterrole)
 
 	if r.config.showRules {
-		nsrules := r.newRulesNode0(namespace, "ns", "Role", "Namespace-scoped\naccess rules", false)
-		edge(role, nsrules)
+		nsrules := newRulesNode0(namespace, "ns", "Role", "Namespace-scoped\naccess rules", false)
+		newRoleToRulesEdge(role, nsrules)
 
-		nsrules2 := r.newRulesNode0(namespace, "ns", "ClusterRole", "Namespace-scoped access rules From ClusterRole", false)
+		nsrules2 := newRulesNode0(namespace, "ns", "ClusterRole", "Namespace-scoped access rules From ClusterRole", false)
 		nsrules2.Attr("label", "Namespace-scoped\naccess rules")
-		edge(clusterRoleBoundLocally, nsrules2)
+		newRoleToRulesEdge(clusterRoleBoundLocally, nsrules2)
 
-		clusterrules := r.newRulesNode0(legend, "", "ClusterRole", "Cluster-scoped\naccess rules", false)
-		edge(clusterrole, clusterrules)
+		clusterrules := newRulesNode0(legend, "", "ClusterRole", "Cluster-scoped\naccess rules", false)
+		newRoleToRulesEdge(clusterrole, clusterrules)
 	}
 }
 
@@ -562,82 +560,8 @@ func struct2json(s map[string]interface{}) (string, error) {
 	return string(str), nil
 }
 
-func (r *Rback) newNamespaceSubgraph(g *dot.Graph, ns string) *dot.Graph {
-	if ns == "" {
-		return g
-	}
-	gns := g.Subgraph(ns, dot.ClusterOption{})
-	gns.Attr("style", "dashed")
-	return gns
-}
-
 func (r *Rback) newSubjectNode(gns *dot.Graph, kind string, ns string, name string) dot.Node {
-	return r.newSubjectNode0(gns, kind, name, r.subjectExists(kind, ns, name), r.isFocused(strings.ToLower(kind), ns, name))
-}
-
-func (r *Rback) newSubjectNode0(g *dot.Graph, kind, name string, exists, highlight bool) dot.Node {
-	return g.Node(kind+"-"+name).
-		Box().
-		Attr("label", formatLabel(fmt.Sprintf("%s\n(%s)", name, kind), highlight)).
-		Attr("style", iff(exists, "filled", "dotted")).
-		Attr("color", iff(exists, "black", "red")).
-		Attr("penwidth", iff(highlight || !exists, "2.0", "1.0")).
-		Attr("fillcolor", "#2f6de1").
-		Attr("fontcolor", iff(exists, "#f0f0f0", "#030303"))
-}
-
-func (r *Rback) newRoleBindingNode(g *dot.Graph, name string, highlight bool) dot.Node {
-	return g.Node("rb-"+name).
-		Attr("label", formatLabel(name, highlight)).
-		Attr("shape", "octagon").
-		Attr("style", "filled").
-		Attr("penwidth", iff(highlight, "2.0", "1.0")).
-		Attr("fillcolor", "#ffcc00").
-		Attr("fontcolor", "#030303")
-}
-
-func (r *Rback) newClusterRoleBindingNode(g *dot.Graph, name string, highlight bool) dot.Node {
-	return g.Node("crb-"+name).
-		Attr("label", formatLabel(name, highlight)).
-		Attr("shape", "doubleoctagon").
-		Attr("style", "filled").
-		Attr("penwidth", iff(highlight, "2.0", "1.0")).
-		Attr("fillcolor", "#ffcc00").
-		Attr("fontcolor", "#030303")
-}
-
-func (r *Rback) newRoleNode(g *dot.Graph, namespace, name string, exists, highlight bool) dot.Node {
-	node := g.Node("r-"+namespace+"/"+name).
-		Attr("label", formatLabel(name, highlight)).
-		Attr("shape", "octagon").
-		Attr("style", iff(exists, "filled", "dotted")).
-		Attr("color", iff(exists, "black", "red")).
-		Attr("penwidth", iff(highlight || !exists, "2.0", "1.0")).
-		Attr("fillcolor", "#ff9900").
-		Attr("fontcolor", "#030303")
-	g.Root().AddToSameRank("Roles", node)
-	return node
-}
-
-func (r *Rback) newClusterRoleNode(g *dot.Graph, bindingNamespace, roleName string, exists, highlight bool) dot.Node {
-	node := g.Node("cr-"+bindingNamespace+"/"+roleName).
-		Attr("label", formatLabel(roleName, highlight)).
-		Attr("shape", "doubleoctagon").
-		Attr("style", iff(exists, iff(bindingNamespace == "", "filled", "filled,dashed"), "dotted")).
-		Attr("color", iff(exists, "black", "red")).
-		Attr("penwidth", iff(highlight || !exists, "2.0", "1.0")).
-		Attr("fillcolor", "#ff9900").
-		Attr("fontcolor", "#030303")
-	g.Root().AddToSameRank("Roles", node)
-	return node
-}
-
-func formatLabel(label string, highlight bool) interface{} {
-	if highlight {
-		return dot.HTML("<b>" + escapeHTML(label) + "</b>")
-	} else {
-		return label
-	}
+	return newSubjectNode0(gns, kind, name, r.subjectExists(kind, ns, name), r.isFocused(strings.ToLower(kind), ns, name))
 }
 
 func (r *Rback) isFocused(kind string, ns string, name string) bool {
@@ -690,62 +614,30 @@ func (r *Rback) ruleMatchesSelection(roleRef NamespacedName) bool {
 }
 
 func (r *Rback) newRulesNode(g *dot.Graph, namespace, roleName string, highlight bool) *dot.Node {
-	var rules string
+	var rulesText string
 	if roles, found := r.permissions.Roles[namespace]; found {
 		if role, found := roles[roleName]; found {
+			ellipsis := regularLine("...")
 			for _, rule := range role.rules {
 				ruleMatches := r.config.resourceKind == kindRule && highlight && r.config.whoCan.matches(rule)
 				if ruleMatches {
-					rules += "<b>" + escapeHTML(rule.toHumanReadableString()) + "</b>" + `<br align="left"/>`
+					rulesText += boldLine(rule.toHumanReadableString())
 				} else {
 					if r.config.whoCan.showMatchedOnly {
-						if !strings.HasSuffix(rules, `...<br align="left"/>`) {
-							rules += `...<br align="left"/>`
+						if !strings.HasSuffix(rulesText, ellipsis) {
+							rulesText += ellipsis
 						}
 					} else {
-						rules += escapeHTML(rule.toHumanReadableString()) + `<br align="left"/>`
+						rulesText += regularLine(rule.toHumanReadableString())
 					}
 				}
 			}
 		}
 	}
-	if rules == "" {
+	if rulesText == "" {
 		return nil
 	} else {
-		node := r.newRulesNode0(g, namespace, roleName, rules, highlight)
+		node := newRulesNode0(g, namespace, roleName, rulesText, highlight)
 		return &node
-	}
-}
-
-func escapeHTML(str string) string {
-	str = strings.ReplaceAll(str, `<`, `&lt;`)
-	str = strings.ReplaceAll(str, `>`, `&gt;`)
-	str = strings.ReplaceAll(str, ` `, `&nbsp;`)
-	str = strings.ReplaceAll(str, "\n", `<br/>`)
-	return str
-}
-
-func (r *Rback) newRulesNode0(g *dot.Graph, namespace, roleName, rulesHTML string, highlight bool) dot.Node {
-	return g.Node("rules-"+namespace+"/"+roleName).
-		Attr("label", dot.HTML(rulesHTML)).
-		Attr("shape", "note").
-		Attr("penwidth", iff(highlight, "2.0", "1.0"))
-}
-
-// edge creates a new edge between two nodes, but only if the edge doesn't exist yet
-func edge(from dot.Node, to dot.Node) dot.Edge {
-	existingEdges := from.EdgesTo(to)
-	if len(existingEdges) == 0 {
-		return from.Edge(to)
-	} else {
-		return existingEdges[0]
-	}
-}
-
-func iff(condition bool, string1, string2 string) string {
-	if condition {
-		return string1
-	} else {
-		return string2
 	}
 }

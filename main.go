@@ -29,7 +29,29 @@ type WhoCan struct {
 }
 
 func main() {
+	config := parseConfigFromArgs()
+	rback := Rback{config: config}
 
+	var err error
+	reader := os.Stdin
+	if config.inputFile != "" {
+		reader, err = os.Open(config.inputFile)
+		if err != nil {
+			fmt.Fprintf(os.Stderr, "Can't open file %s: %v\n", config.inputFile, err)
+			os.Exit(-1)
+		}
+	}
+
+	err = rback.parseRBAC(reader)
+	if err != nil {
+		fmt.Fprintf(os.Stderr, "Can't parse RBAC resources from stdin: %v\n", err)
+		os.Exit(-1)
+	}
+	g := rback.genGraph()
+	fmt.Println(g.String())
+}
+
+func parseConfigFromArgs() Config {
 	config := Config{}
 	flag.StringVar(&config.inputFile, "f", "", "The name of the file to use as input (otherwise stdin is used)")
 	flag.BoolVar(&config.showLegend, "show-legend", true, "Whether to show the legend or not")
@@ -68,26 +90,7 @@ func main() {
 	if ignoredPrefixes != "none" {
 		config.ignoredPrefixes = strings.Split(ignoredPrefixes, ",")
 	}
-
-	rback := Rback{config: config}
-
-	var err error
-	reader := os.Stdin
-	if config.inputFile != "" {
-		reader, err = os.Open(config.inputFile)
-		if err != nil {
-			fmt.Fprintf(os.Stderr, "Can't open file %s: %v\n", config.inputFile, err)
-			os.Exit(-1)
-		}
-	}
-
-	err = rback.parseRBAC(reader)
-	if err != nil {
-		fmt.Fprintf(os.Stderr, "Can't parse RBAC resources from stdin: %v\n", err)
-		os.Exit(-1)
-	}
-	g := rback.genGraph()
-	fmt.Println(g.String())
+	return config
 }
 
 const (

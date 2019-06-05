@@ -67,7 +67,7 @@ $ kubectl get sa,roles,rolebindings,clusterroles,clusterrolebindings --all-names
 ```
 
 
-## Using Rback as a kubectl plugin
+## Using rback as a kubectl plugin
 
 There is also a very crude first version of a kubectl plugin in https://github.com/team-soteria/rback/blob/master/kubectl-plugin/kubectl-rback. Add the file to your path, ensure it is executable and modify it to suit your environment. Then, you'll be able to simply run:
 ```sh
@@ -129,16 +129,7 @@ When using `who-can`, you can also tell `rback` to only show matched rules inste
 $ kubectl rback --show-matched-rules-only who-can create pods
 ```
 
-## Background
+## How it works
 
-How it works is that `rback` issues the following five queries by shelling out to `kubectl`:
+To follow the "Do One Thing And Do It Well" Unix philosophy, `rback` does not call out to `kubectl` to read RBAC resources (although initial versions did do that) and does not actually render the image. All it does is parse a list of RBAC resources passed in through `stdin`, and then prints out a GraphViz `.dot` file to `stdout` using the [github.com/emicklei/dot](https://github.com/emicklei/dot) package.
 
-```sh
-kubectl get sa --all-namespaces --output json
-kubectl get roles --all-namespaces --output json
-kubectl get rolebindings --all-namespaces --output json
-kubectl get clusterroles --output json
-kubectl get clusterrolebindings --output json
-```
-
-Then, based on this information, the graphs are created using the [github.com/emicklei/dot](https://github.com/emicklei/dot) package.

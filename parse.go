@@ -58,7 +58,29 @@ func (r *Rback) parseRBAC(reader io.Reader) (err error) {
 			log.Printf("Ignoring resource kind %s", kind)
 		}
 	}
+
+	// resolve Role references in bindings (a Binding's roleRef references either a Role in the same namespace as the Binding, or a ClusterRole; this code finds the actual (Cluster)Role)
+	for ns, bindings := range r.permissions.RoleBindings {
+		for _, binding := range bindings {
+			binding.role = r.resolveRoleRef(binding.role.name, ns)
+			r.permissions.RoleBindings[ns][binding.name] = binding
+		}
+	}
 	return nil
+}
+
+func (r *Rback) resolveRoleRef(roleName string, bindingNamespace string) NamespacedName {
+	if roles, found := r.permissions.Roles[bindingNamespace]; found {
+		if role, found := roles[roleName]; found {
+			return role.NamespacedName
+		}
+	}
+	if roles, found := r.permissions.Roles[""]; found { // find in cluster roles
+		if role, found := roles[roleName]; found {
+			return role.NamespacedName
+		}
+	}
+	return NamespacedName{bindingNamespace, roleName}
 }
 
 func (r *Rback) shouldIgnore(name string) bool {
@@ -116,7 +138,7 @@ func (r *Rback) toBinding(rawBinding map[string]interface{}) Binding {
 	}
 	return Binding{
 		NamespacedName: getNamespacedName(getMetadata(rawBinding)),
-		role:           getNamespacedName(rawBinding["roleRef"].(map[string]interface{})),
+		role:           getNamespacedName(rawBinding["roleRef"].(map[string]interface{})), // NOTE: there's no namespace field in roleRef, so namespace is always ""
 		subjects:       subjects,
 	}
 }
